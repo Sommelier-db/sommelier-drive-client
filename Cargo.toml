@@ -1,0 +1,17 @@
+[package]
+name = "sommelier-drive-client"
+version = "0.1.0"
+edition = "2021"
+author = ["Sora Suegami"]
+
+[dependencies]
+sommelier-drive-cryptos = {git = "https://github.com/Sommelier-db/sommelier-drive-cryptos.git", version = "0.1.0", default-features=false}
+rust-searchable-pke = {git = "https://github.com/SoraSuegami/rust-searchable-pke.git", branch = "develop", version = "0.1.0", default-features=false}
+paired = "0.22.0"
+groupy = "0.4.1"
+serde_json = "1.0"
+serde = {version = "1.0.103", features = ["derive"]}
+thiserror = "1.0.37"
+getrandom = { version = "0.2", features = ["js"] }
+reqwest-wasm = {version = "0.11.15", features = ["json"]}
+anyhow = "1.0.66"
