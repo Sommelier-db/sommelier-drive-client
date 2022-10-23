@@ -39,7 +39,7 @@ pub struct ContentsTableReocrd {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WritePermissionTable {
+pub struct WritePermissionTableRecord {
     write_permission_id: DBInt,
     path_id: DBInt,
     user_id: DBInt,
