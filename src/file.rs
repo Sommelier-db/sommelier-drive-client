@@ -6,9 +6,7 @@ use crate::{get_user_public_keys, http_client::HttpClient};
 use anyhow::Result;
 use paired::bls12_381::Fr;
 use rust_searchable_pke::expressions::gen_ciphertext_for_prefix_search;
-use rust_searchable_pke::expressions::{
-    gen_trapdoor_for_prefix_search, gen_trapdoor_for_prefix_search_exact,
-};
+use rust_searchable_pke::expressions::gen_trapdoor_for_prefix_search;
 use sommelier_drive_cryptos::*;
 
 pub async fn get_filepath_with_id(
