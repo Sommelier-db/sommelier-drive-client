@@ -1,9 +1,9 @@
-mod filepath;
+mod file;
 mod http_client;
 mod types;
 mod user;
 
-pub use filepath::*;
-pub(crate) use http_client::HttpClient;
+pub use file::*;
+pub use http_client::HttpClient;
 pub use types::*;
 pub use user::*;

@@ -19,6 +19,8 @@ hex = {version = "0.4.3"}
 rand_core = "0.5.1"
 aes-gcm = "0.10.1" 
 rand = "0.7.0"
+bytes = "1"
+
 
 [lib]
 crate-type = ["cdylib", "rlib"]

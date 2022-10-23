@@ -2,7 +2,6 @@ use crate::http_client::HttpClient;
 use crate::types::*;
 use aes_gcm::aead;
 use anyhow::Result;
-use rust_searchable_pke::pecdk;
 use sommelier_drive_cryptos::{
     pke_gen_public_key, pke_gen_secret_key, JsonString, PkePublicKey, PkeSecretKey,
 };

@@ -4,14 +4,11 @@ use crate::types::{
 };
 use aes_gcm::aead::OsRng;
 use anyhow::Result;
-use paired::bls12_381::{Bls12, Fr};
 use reqwest_wasm::{
     self,
     header::{HeaderValue, AUTHORIZATION},
     RequestBuilder,
 };
-use rust_searchable_pke::pecdk;
-use serde::{Deserialize, Serialize};
 use serde_json;
 use sommelier_drive_cryptos::{
     gen_signature, FilePathCT, HashDigest, HexString, JsonString, PkePublicKey, PkeSecretKey,
@@ -84,20 +81,19 @@ impl HttpClient {
     pub async fn post_file_path(
         &self,
         sk: &PkeSecretKey,
-        path_id: DBInt,
         write_user_id: DBInt,
         read_user_id: DBInt,
         permission_hash: &HashDigest,
-        data_ct: &[u8],
+        data_ct: &FilePathCT,
         keyword_ct: &KeywordCT,
     ) -> Result<DBInt> {
-        let url = self.base_url.to_string() + "/file-path/" + &path_id.to_string();
+        let url = self.base_url.to_string() + "/file-path";
         let client = reqwest_wasm::Client::new();
 
         let write_user_id_str = write_user_id.to_string();
         let read_user_id_str = read_user_id.to_string();
         let permission_hash_str: String = permission_hash.to_string();
-        let data_ct_str = hex::encode(data_ct);
+        let data_ct_str = data_ct.to_string();
         let keyword_ct_str = serde_json::to_string(&keyword_ct)?;
 
         let mut map_for_post = HashMap::new();
