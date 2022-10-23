@@ -285,6 +285,25 @@ async fn recover_shared_key_of_filepath(
     user_info: &SelfUserInfo,
     filepath: &str,
 ) -> Result<RecoveredSharedKey> {
+    let (_, parent_filepath) = split_filepath(filepath);
+    let permission_hash = compute_permission_hash(user_info.id, &parent_filepath);
+    let records = client.get_children_file_pathes(&permission_hash).await?;
+    let path_id: DBInt = records
+        .into_iter()
+        .filter(
+            |record| match decrypt_filepath_ct_str(&record.data_ct, &user_info.data_sk) {
+                Ok(str) => str == filepath,
+                Err(_) => false,
+            },
+        )
+        .map(|record| record.path_id)
+        .last()
+        .ok_or(anyhow::anyhow!(format!(
+            "No file exists for the filepath {}",
+            filepath
+        )))?;
+
+    /*
     let mut rng = rand_core::OsRng;
     let td = gen_trapdoor_for_prefix_search_exact::<_, Fr, _>(
         &user_info.keyword_sk,
@@ -294,6 +313,7 @@ async fn recover_shared_key_of_filepath(
     )?;
     let records = client.search_file_pathes(user_info.id, &td).await?;
     let path_id = records[0].path_id;
+    */
     let shared_key_record = client.get_shared_key(path_id).await?;
     let shared_key_ct = hex::decode(&shared_key_record.shared_key_ct)?;
     let recovered_shared_key = recover_shared_key(&user_info.data_sk, &shared_key_ct)?;
