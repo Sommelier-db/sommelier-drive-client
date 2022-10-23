@@ -13,7 +13,9 @@ use reqwest_wasm::{
 use rust_searchable_pke::pecdk;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use sommelier_drive_cryptos::{gen_signature, FilePathCT, HashDigest, PkePublicKey, PkeSecretKey};
+use sommelier_drive_cryptos::{
+    gen_signature, FilePathCT, HashDigest, HexString, JsonString, PkePublicKey, PkeSecretKey,
+};
 use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Clone)]
@@ -33,11 +35,11 @@ impl HttpClient {
         Ok(record)
     }
 
-    pub async fn post_user(&self, data_pk: PkePublicKey, keyword_pk: KeywordPK) -> Result<DBInt> {
+    pub async fn post_user(&self, data_pk: &PkePublicKey, keyword_pk: &KeywordPK) -> Result<DBInt> {
         let url = self.base_url.to_string() + "/user";
         let client = reqwest_wasm::Client::new();
         let mut map = HashMap::<String, String>::new();
-        map.insert("dataPK".to_string(), data_pk.try_into()?);
+        map.insert("dataPK".to_string(), data_pk.to_string()?);
         map.insert("keywordPK".to_string(), serde_json::to_string(&keyword_pk)?);
         let res = client.post(url).json(&map).send().await?;
         let text = res.text().await?;
@@ -55,9 +57,9 @@ impl HttpClient {
 
     pub async fn get_children_file_pathes(
         &self,
-        permission_hash: HashDigest,
+        permission_hash: &HashDigest,
     ) -> Result<Vec<PathTableRecord>> {
-        let permission_hash_str: String = permission_hash.into();
+        let permission_hash_str: String = permission_hash.to_string();
         let url = self.base_url.to_string() + "/file-path/children/" + &permission_hash_str;
         let records = reqwest_wasm::get(&url)
             .await?
@@ -85,16 +87,16 @@ impl HttpClient {
         path_id: DBInt,
         write_user_id: DBInt,
         read_user_id: DBInt,
-        permission_hash: HashDigest,
-        data_ct: Vec<u8>,
-        keyword_ct: KeywordCT,
+        permission_hash: &HashDigest,
+        data_ct: &[u8],
+        keyword_ct: &KeywordCT,
     ) -> Result<DBInt> {
         let url = self.base_url.to_string() + "/file-path/" + &path_id.to_string();
         let client = reqwest_wasm::Client::new();
 
         let write_user_id_str = write_user_id.to_string();
         let read_user_id_str = read_user_id.to_string();
-        let permission_hash_str: String = permission_hash.into();
+        let permission_hash_str: String = permission_hash.to_string();
         let data_ct_str = hex::encode(data_ct);
         let keyword_ct_str = serde_json::to_string(&keyword_ct)?;
 
@@ -162,8 +164,8 @@ impl HttpClient {
         Ok(DBInt::from_str_radix(&text, 10)?)
     }
 
-    pub async fn get_contents(&self, shared_key_hash: HashDigest) -> Result<ContentsTableReocrd> {
-        let shared_key_hash_str: String = shared_key_hash.into();
+    pub async fn get_contents(&self, shared_key_hash: &HashDigest) -> Result<ContentsTableReocrd> {
+        let shared_key_hash_str: String = shared_key_hash.to_string();
         let url = self.base_url.to_string()
             + "/contents/?shared-key-hash="
             + shared_key_hash_str.as_str();
@@ -177,14 +179,14 @@ impl HttpClient {
     pub async fn post_contents(
         &self,
         write_user_id: DBInt,
-        shared_key_hash: HashDigest,
+        shared_key_hash: &HashDigest,
         contents_ct: &[u8],
     ) -> Result<DBInt> {
         let url = self.base_url.to_string() + "/contents";
         let client = reqwest_wasm::Client::new();
 
         let write_user_id_str = write_user_id.to_string();
-        let shared_key_hash_str: String = shared_key_hash.into();
+        let shared_key_hash_str: String = shared_key_hash.to_string();
         let ct_str = hex::encode(contents_ct);
 
         let mut map_for_post = HashMap::new();
@@ -210,10 +212,10 @@ impl HttpClient {
     pub async fn put_contents(
         &self,
         write_user_id: DBInt,
-        shared_key_hash: HashDigest,
+        shared_key_hash: &HashDigest,
         contents_ct: &[u8],
     ) -> Result<DBInt> {
-        let shared_key_hash_str: String = shared_key_hash.into();
+        let shared_key_hash_str: String = shared_key_hash.to_string();
         let url = self.base_url.to_string()
             + "/contents/?shared-key-hash="
             + shared_key_hash_str.as_str();
