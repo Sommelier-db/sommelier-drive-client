@@ -20,9 +20,8 @@ use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Clone)]
 pub struct HttpClient {
-    base_url: String,
-    region_name: &'static str,
-    sk: PkeSecretKey,
+    pub(crate) base_url: String,
+    pub(crate) region_name: &'static str,
 }
 
 impl HttpClient {
@@ -46,8 +45,8 @@ impl HttpClient {
         Ok(DBInt::from_str_radix(&text, 10)?)
     }
 
-    pub async fn get_file_path(&self, path_id: &str) -> Result<PathTableRecord> {
-        let url = self.base_url.to_string() + "/file-path/" + path_id;
+    pub async fn get_file_path(&self, path_id: DBInt) -> Result<PathTableRecord> {
+        let url = self.base_url.to_string() + "/file-path/" + path_id.to_string().as_ref();
         let record = reqwest_wasm::get(&url)
             .await?
             .json::<PathTableRecord>()
@@ -84,6 +83,7 @@ impl HttpClient {
 
     pub async fn post_file_path(
         &self,
+        sk: &PkeSecretKey,
         path_id: DBInt,
         write_user_id: DBInt,
         read_user_id: DBInt,
@@ -115,7 +115,7 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(req_without_auth, "POST", &url, map_for_sign)?
+            .attach_signature(sk, req_without_auth, "POST", &url, map_for_sign)?
             .send()
             .await?;
         let text = res.text().await?;
@@ -133,6 +133,7 @@ impl HttpClient {
 
     pub async fn post_shared_key(
         &self,
+        sk: &PkeSecretKey,
         path_id: DBInt,
         write_user_id: DBInt,
         shared_key_ct: &[u8],
@@ -157,7 +158,7 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(req_without_auth, "POST", &url, map_for_sign)?
+            .attach_signature(sk, req_without_auth, "POST", &url, map_for_sign)?
             .send()
             .await?;
         let text = res.text().await?;
@@ -178,6 +179,7 @@ impl HttpClient {
 
     pub async fn post_contents(
         &self,
+        sk: &PkeSecretKey,
         write_user_id: DBInt,
         shared_key_hash: &HashDigest,
         contents_ct: &[u8],
@@ -202,7 +204,7 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(req_without_auth, "POST", &url, map_for_sign)?
+            .attach_signature(sk, req_without_auth, "POST", &url, map_for_sign)?
             .send()
             .await?;
         let text = res.text().await?;
@@ -211,6 +213,7 @@ impl HttpClient {
 
     pub async fn put_contents(
         &self,
+        sk: &PkeSecretKey,
         write_user_id: DBInt,
         shared_key_hash: &HashDigest,
         contents_ct: &[u8],
@@ -236,7 +239,7 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(req_without_auth, "PUT", &url, map_for_sign)?
+            .attach_signature(sk, req_without_auth, "PUT", &url, map_for_sign)?
             .send()
             .await?;
         let text = res.text().await?;
@@ -256,6 +259,7 @@ impl HttpClient {
 
     pub async fn post_write_permission(
         &self,
+        sk: &PkeSecretKey,
         write_user_id: DBInt,
         path_id: DBInt,
         permitted_user_id: DBInt,
@@ -280,7 +284,7 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(req_without_auth, "POST", &url, map_for_sign)?
+            .attach_signature(sk, req_without_auth, "POST", &url, map_for_sign)?
             .send()
             .await?;
         let text = res.text().await?;
@@ -289,20 +293,14 @@ impl HttpClient {
 
     fn attach_signature(
         &self,
+        sk: &PkeSecretKey,
         request_builder: RequestBuilder,
         method: &str,
         url: &str,
         map_for_sign: BTreeMap<&str, &str>,
     ) -> Result<RequestBuilder> {
         let mut rng = OsRng;
-        let signature = gen_signature(
-            &self.sk,
-            &self.region_name,
-            method,
-            url,
-            map_for_sign,
-            &mut rng,
-        );
+        let signature = gen_signature(sk, &self.region_name, method, url, map_for_sign, &mut rng);
         let mut header_val = HeaderValue::from_str(&hex::encode(signature))?;
         header_val.set_sensitive(true);
         Ok(request_builder.header(AUTHORIZATION, header_val))

@@ -9,9 +9,9 @@ use sommelier_drive_cryptos::{
 
 #[derive(Debug, Clone)]
 pub struct SelfUserInfo {
-    data_sk: PkeSecretKey,
-    keyword_sk: KeywordSK,
-    id: DBInt,
+    pub(crate) data_sk: PkeSecretKey,
+    pub(crate) keyword_sk: KeywordSK,
+    pub(crate) id: DBInt,
 }
 
 pub async fn register_user(client: &HttpClient) -> Result<SelfUserInfo> {
