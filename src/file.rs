@@ -23,7 +23,7 @@ pub async fn get_filepath_with_id(
     )?)
 }
 
-pub async fn get_children_pathes_under_current_path(
+pub async fn get_children_pathes(
     client: &HttpClient,
     user_info: &SelfUserInfo,
     cur_path: &str,
@@ -37,7 +37,7 @@ pub async fn get_children_pathes_under_current_path(
     Ok(pathfile_names)
 }
 
-pub async fn get_descendant_pathes_under_current_path(
+pub async fn search_descendant_pathes(
     client: &HttpClient,
     user_info: &SelfUserInfo,
     cur_path: &str,
