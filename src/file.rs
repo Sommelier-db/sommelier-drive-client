@@ -265,6 +265,7 @@ pub async fn modify_file(
         &pre_contents_record.contents_ct.to_string(),
         &recovered_shared_key.shared_key,
     )?;
+    new_contents.is_file = true;
     new_contents.file_bytes = new_file_bytes;
     let new_contents_ct =
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
