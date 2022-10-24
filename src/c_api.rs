@@ -246,6 +246,26 @@ fn_int_pointer!(
     }
 );
 
+fn_int_pointer!(
+    fn isExistFilepath(
+        client: CHttpClient,
+        user_info: CUserInfo,
+        filepath: *mut c_char,
+    ) -> Result<c_int, anyhow::Error> {
+        let client = client.into();
+        let user_info = user_info.try_into()?;
+        let filepath = ptr2str(filepath);
+        let fut_result = async { is_exist_filepath(&client, &user_info, filepath).await };
+        let rt = Runtime::new()?;
+        let is_exist = rt.block_on(fut_result)?;
+        if is_exist {
+            Ok(1)
+        } else {
+            Ok(0)
+        }
+    }
+);
+
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct CContentsData {

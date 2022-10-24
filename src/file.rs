@@ -55,6 +55,18 @@ pub async fn search_descendant_pathes(
     Ok(pathfile_names)
 }
 
+pub async fn is_exist_filepath(
+    client: &HttpClient,
+    user_info: &SelfUserInfo,
+    filepath: &str,
+) -> Result<bool> {
+    let path_id = get_path_id_of_filepath(client, user_info, filepath).await?;
+    match path_id {
+        Some(_) => Ok(true),
+        None => Ok(false),
+    }
+}
+
 pub async fn open_filepath(
     client: &HttpClient,
     user_info: &SelfUserInfo,
@@ -173,17 +185,6 @@ async fn add_contents_generic(
             &file_ct.contents_ct,
         )
         .await?;
-
-    /*
-    // 4. Write permission table
-    for i in 0..num_writeable_users {
-        let permitted_user_id = new_contents_data.writeable_user_ids[i];
-        let path_id = path_id_of_user_id[&permitted_user_id];
-        client
-            .post_write_permission(data_sk, write_user_id, path_id, permitted_user_id)
-            .await?;
-    }
-    */
     Ok(())
 }
 
@@ -315,11 +316,11 @@ async fn get_path_id_of_filepath(
     client: &HttpClient,
     user_info: &SelfUserInfo,
     filepath: &str,
-) -> Result<DBInt> {
+) -> Result<Option<DBInt>> {
     let (_, parent_filepath) = split_filepath(filepath);
     let permission_hash = compute_permission_hash(user_info.id, &parent_filepath);
     let records = client.get_children_file_pathes(&permission_hash).await?;
-    let path_id: DBInt = records
+    let path_id = records
         .into_iter()
         .filter(
             |record| match decrypt_filepath_ct_str(&record.data_ct, &user_info.data_sk) {
@@ -328,11 +329,7 @@ async fn get_path_id_of_filepath(
             },
         )
         .map(|record| record.path_id)
-        .last()
-        .ok_or(anyhow::anyhow!(format!(
-            "No file exists for the filepath {}",
-            filepath
-        )))?;
+        .last();
     Ok(path_id)
 }
 
@@ -341,7 +338,12 @@ async fn recover_shared_key_of_filepath(
     user_info: &SelfUserInfo,
     filepath: &str,
 ) -> Result<RecoveredSharedKey> {
-    let path_id = get_path_id_of_filepath(client, user_info, filepath).await?;
+    let path_id = get_path_id_of_filepath(client, user_info, filepath)
+        .await?
+        .ok_or(anyhow::anyhow!(format!(
+            "No file exists for the filepath {}",
+            filepath
+        )))?;
 
     /*
     let mut rng = rand_core::OsRng;
