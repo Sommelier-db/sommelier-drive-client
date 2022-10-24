@@ -2,7 +2,7 @@
 name = "sommelier-drive-client"
 version = "0.1.0"
 edition = "2021"
-author = ["Sora Suegami"]
+authors = ["Sora Suegami"]
 
 [dependencies]
 sommelier-drive-cryptos = {git = "https://github.com/Sommelier-db/sommelier-drive-cryptos.git", version = "0.1.0", default-features=false}
@@ -22,11 +22,16 @@ rand = "0.7.0"
 bytes = "1"
 easy_ffi = {version = "0.1.0", git = "https://github.com/SoraSuegami/easy_ffi.git", optional = true}
 errno = {version = "0.2.8", optional = true}
-futures = {version = "0.3.25", features = ["executor"], optional = true}
+#futures = {version = "0.3.25", features = ["executor"], optional = true}
+tokio = {version = "1.21.2", features = ["rt", "rt-multi-thread"], optional = true}
+
+
+[dev-dependencies]
+tokio = {version = "1.21.2", features = ["macros"]}
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["c_api"]
-c_api = ["easy_ffi", "errno", "futures"]
+c_api = ["easy_ffi", "errno", "tokio"]

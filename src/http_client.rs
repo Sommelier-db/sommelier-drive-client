@@ -22,6 +22,13 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
+    pub fn new(base_url: &str, region_name: &'static str) -> Self {
+        Self {
+            base_url: base_url.to_string(),
+            region_name,
+        }
+    }
+
     pub async fn get_user(&self, user_id: DBInt) -> Result<UserTableRecord> {
         let url = self.base_url.to_string() + "/user/" + &user_id.to_string();
         let record = reqwest_wasm::get(&url)
@@ -351,5 +358,38 @@ impl HttpClient {
         let mut header_val = HeaderValue::from_str(&hex::encode(signature))?;
         header_val.set_sensitive(true);
         Ok(request_builder.header(AUTHORIZATION, header_val))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use sommelier_drive_cryptos::{pke_gen_public_key, pke_gen_secret_key, verify_signature};
+
+    use super::*;
+    use tokio;
+
+    #[tokio::test]
+    async fn attach_signature_test() {
+        let mut rng = OsRng;
+        let sk = pke_gen_secret_key(&mut rng).unwrap();
+        let base_url = "http://test.com";
+        let client = reqwest_wasm::Client::new();
+        let request_builder = client.post(base_url);
+        let method = "POST";
+        let url = base_url.to_string() + "/post";
+        let user_id = 1;
+        let mut map_for_sign = BTreeMap::new();
+        map_for_sign.insert("key1", "value1");
+        map_for_sign.insert("key2", "value2");
+        let region_name = "attach_signature_test";
+        let client = HttpClient::new(base_url, region_name);
+        /*let signature_request = client
+            .attach_signature(&sk, request_builder, method, &url, user_id, map_for_sign)
+            .await
+            .unwrap()
+            .build()
+            .unwrap();
+        let signature_value = signature_request.headers().get(AUTHORIZATION).unwrap();
+        let signature = hex::decode(signature_value.to_str().unwrap()).unwrap();*/
     }
 }

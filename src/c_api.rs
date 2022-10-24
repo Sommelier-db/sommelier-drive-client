@@ -3,7 +3,7 @@ use anyhow;
 use core::slice;
 use easy_ffi::easy_ffi;
 use errno::{set_errno, Errno};
-use futures::executor;
+//use futures::executor;
 use serde_json;
 use sommelier_drive_cryptos::JsonString;
 use sommelier_drive_cryptos::PkeSecretKey;
@@ -12,6 +12,7 @@ use std::mem;
 use std::os::raw::c_char;
 use std::os::raw::c_int;
 use std::ptr;
+use tokio::runtime::Runtime;
 const EINVAL: i32 = 22;
 
 #[repr(C)]
@@ -112,7 +113,9 @@ fn_user_info!(
     fn registerUser(client: CHttpClient) -> Result<CUserInfo, anyhow::Error> {
         let client: HttpClient = client.into();
         let fut_result = async { register_user(&client).await };
-        let self_user_info = executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        let self_user_info = rt.block_on(fut_result)?;
+        //let self_user_info = executor::block_on(fut_result)?;
 
         let user_info = CUserInfo::try_from(self_user_info)?;
         Ok(user_info)
@@ -147,7 +150,8 @@ fn_public_keys!(
     fn getPublicKeys(client: CHttpClient, user_id: u64) -> Result<CPublicKeys, anyhow::Error> {
         let client: HttpClient = client.into();
         let fut_result = async { get_user_public_keys(&client, user_id).await };
-        let (data_pk, keyword_pk) = executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        let (data_pk, keyword_pk) = rt.block_on(fut_result)?;
 
         let pks = CPublicKeys {
             data_pk: str2ptr(data_pk.to_string()?.as_str()),
@@ -180,7 +184,8 @@ fn_char_pointer!(
         let client = client.into();
         let user_info = user_info.try_into()?;
         let fut_result = async { get_filepath_with_id(&client, &user_info, path_id).await };
-        let filepath = executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        let filepath = rt.block_on(fut_result)?;
         let filepath_ptr = str2ptr(filepath.as_str());
         Ok(filepath_ptr)
     }
@@ -211,7 +216,8 @@ fn_int_pointer!(
         let user_info = user_info.try_into()?;
         let cur_path = ptr2str(cur_path);
         let fut_result = async { get_children_pathes(&client, &user_info, cur_path).await };
-        let filepath_vec = executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        let filepath_vec = rt.block_on(fut_result)?;
         let len = filepath_vec.len();
         let result_pathes = unsafe { slice::from_raw_parts_mut(result_pathes, 0) };
         for (i, filepath) in filepath_vec.into_iter().enumerate() {
@@ -232,7 +238,8 @@ fn_int_pointer!(
         let user_info = user_info.try_into()?;
         let cur_path = ptr2str(cur_path);
         let fut_result = async { search_descendant_pathes(&client, &user_info, cur_path).await };
-        let filepath_vec = executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        let filepath_vec = rt.block_on(fut_result)?;
         let len = filepath_vec.len();
         let result_pathes = unsafe { slice::from_raw_parts_mut(result_pathes, 0) };
         for (i, filepath) in filepath_vec.into_iter().enumerate() {
@@ -328,7 +335,8 @@ fn_contents_data!(
         let user_info = user_info.try_into()?;
         let filepath = ptr2str(filepath);
         let fut_result = async { open_filepath(&client, &user_info, filepath).await };
-        let contents_data = executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        let contents_data = rt.block_on(fut_result)?;
         Ok(contents_data.into())
     }
 );
@@ -349,7 +357,8 @@ fn_void!(
         let file_bytes = unsafe { slice::from_raw_parts(file_bytes_ptr, file_bytes_len) }.to_vec();
         let fut_result =
             async { add_file(&client, &user_info, cur_dir, filename, file_bytes).await };
-        executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        rt.block_on(fut_result)?;
         Ok(())
     }
 );
@@ -366,7 +375,8 @@ fn_void!(
         let cur_dir = ptr2str(cur_dir);
         let filename = ptr2str(filename);
         let fut_result = async { add_directory(&client, &user_info, cur_dir, filename).await };
-        executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        rt.block_on(fut_result)?;
         Ok(())
     }
 );
@@ -383,7 +393,8 @@ fn_void!(
         let filepath = ptr2str(filepath);
         let fut_result =
             async { add_read_permission(&client, &user_info, filepath, new_user_id).await };
-        executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        rt.block_on(fut_result)?;
         Ok(())
     }
 );
@@ -402,7 +413,8 @@ fn_void!(
         let file_bytes =
             unsafe { slice::from_raw_parts(new_file_bytes_ptr, new_file_bytes_len) }.to_vec();
         let fut_result = async { modify_file(&client, &user_info, filepath, file_bytes).await };
-        executor::block_on(fut_result)?;
+        let rt = Runtime::new()?;
+        rt.block_on(fut_result)?;
         Ok(())
     }
 );
