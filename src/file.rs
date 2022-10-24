@@ -174,6 +174,7 @@ async fn add_contents_generic(
         )
         .await?;
 
+    /*
     // 4. Write permission table
     for i in 0..num_writeable_users {
         let permitted_user_id = new_contents_data.writeable_user_ids[i];
@@ -182,6 +183,7 @@ async fn add_contents_generic(
             .post_write_permission(data_sk, write_user_id, path_id, permitted_user_id)
             .await?;
     }
+    */
     Ok(())
 }
 

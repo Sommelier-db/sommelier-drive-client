@@ -42,14 +42,14 @@ pub struct ContentsTableReocrd {
     pub(crate) contents_ct: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/*#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WritePermissionTableRecord {
     pub(crate) write_permission_id: DBInt,
     pub(crate) path_id: DBInt,
     pub(crate) user_id: DBInt,
-}
+}*/
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContentsData {
     pub(crate) is_file: bool,
     pub(crate) num_readable_users: usize,
@@ -105,5 +105,25 @@ impl ContentsData {
             buf.put_u8(*file_byte);
         }
         buf
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn contents_data_test() {
+        let test_data = ContentsData {
+            is_file: true,
+            num_readable_users: 2,
+            num_writeable_users: 2,
+            readable_user_ids: vec![1, 2],
+            writeable_user_ids: vec![1, 2],
+            file_bytes: vec![7; 32],
+        };
+        let test_data_bytes = test_data.to_bytes();
+        let recovered_data = ContentsData::from_bytes(&test_data_bytes);
+        assert_eq!(test_data, recovered_data)
     }
 }

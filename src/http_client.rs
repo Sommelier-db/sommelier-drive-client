@@ -1,6 +1,6 @@
 use crate::types::{
     ContentsTableReocrd, DBInt, KeywordCT, KeywordPK, PathTableRecord, SharedKeyTableRecord,
-    Trapdoor, UserTableRecord, WritePermissionTableRecord,
+    Trapdoor, UserTableRecord,
 };
 use aes_gcm::aead::OsRng;
 use anyhow::Result;
@@ -281,7 +281,7 @@ impl HttpClient {
         Ok(DBInt::from_str_radix(&text, 10)?)
     }
 
-    pub async fn get_write_permission(&self, path_id: DBInt) -> Result<WritePermissionTableRecord> {
+    /*pub async fn get_write_permission(&self, path_id: DBInt) -> Result<WritePermissionTableRecord> {
         let url = self.base_url.to_string()
             + "/write-permission/?path-id="
             + path_id.to_string().as_str();
@@ -332,7 +332,7 @@ impl HttpClient {
             .await?;
         let text = res.text().await?;
         Ok(DBInt::from_str_radix(&text, 10)?)
-    }
+    }*/
 
     async fn attach_signature(
         &self,
@@ -358,38 +358,5 @@ impl HttpClient {
         let mut header_val = HeaderValue::from_str(&hex::encode(signature))?;
         header_val.set_sensitive(true);
         Ok(request_builder.header(AUTHORIZATION, header_val))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use sommelier_drive_cryptos::{pke_gen_public_key, pke_gen_secret_key, verify_signature};
-
-    use super::*;
-    use tokio;
-
-    #[tokio::test]
-    async fn attach_signature_test() {
-        let mut rng = OsRng;
-        let sk = pke_gen_secret_key(&mut rng).unwrap();
-        let base_url = "http://test.com";
-        let client = reqwest_wasm::Client::new();
-        let request_builder = client.post(base_url);
-        let method = "POST";
-        let url = base_url.to_string() + "/post";
-        let user_id = 1;
-        let mut map_for_sign = BTreeMap::new();
-        map_for_sign.insert("key1", "value1");
-        map_for_sign.insert("key2", "value2");
-        let region_name = "attach_signature_test";
-        let client = HttpClient::new(base_url, region_name);
-        /*let signature_request = client
-            .attach_signature(&sk, request_builder, method, &url, user_id, map_for_sign)
-            .await
-            .unwrap()
-            .build()
-            .unwrap();
-        let signature_value = signature_request.headers().get(AUTHORIZATION).unwrap();
-        let signature = hex::decode(signature_value.to_str().unwrap()).unwrap();*/
     }
 }
