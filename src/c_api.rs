@@ -4,7 +4,7 @@ use core::slice;
 use easy_ffi::easy_ffi;
 use errno::{set_errno, Errno};
 use serde_json;
-use sommelier_drive_cryptos::JsonString;
+use sommelier_drive_cryptos::PemString;
 use sommelier_drive_cryptos::PkeSecretKey;
 use std::ffi::*;
 use std::mem;

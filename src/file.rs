@@ -181,15 +181,45 @@ async fn add_contents_generic(
             .await?;
     }
 
-    // 3. Contents table
+    // 3. Authorization seed table
+    let authorization_seed = gen_authorization_seed();
+    let mut writeable_user_ids = Vec::with_capacity(num_writeable_users);
+    for i in 0..num_writeable_users {
+        let path_record = client
+            .get_filepath(new_contents_data.writeable_user_path_ids[i])
+            .await?;
+        writeable_user_ids.push(path_record.user_id);
+        let (pk, _) = get_user_public_keys(client, path_record.user_id).await?;
+        let authorization_seed_ct = encrypt_authorization_seed(&pk, authorization_seed)?;
+        client
+            .post_authorization_seed(
+                data_sk,
+                path_record.path_id,
+                path_record.user_id,
+                &authorization_seed_ct,
+            )
+            .await?;
+    }
+
+    // 4. Contents table
+    let authorization_sk = pke_derive_secret_key_from_seeed(authorization_seed)?;
+    let authorization_pk = pke_gen_public_key(&authorization_sk);
     client
         .post_contents(
-            data_sk,
-            write_user_id,
+            authorization_seed,
             &file_ct.shared_key_hash,
             &file_ct.contents_ct,
         )
         .await?;
+
+    // 5. Write permission table
+    for i in 0..num_writeable_users {
+        let path_id = new_contents_data.writeable_user_path_ids[i];
+        let user_id = writeable_user_ids[i];
+        client
+            .post_write_permission(data_sk, write_user_id, path_id, user_id)
+            .await?;
+    }
     Ok(())
 }
 
@@ -201,7 +231,7 @@ pub async fn add_read_permission(
 ) -> Result<()> {
     let (new_data_pk, new_keyword_pk) = get_user_public_keys(client, new_user_id).await?;
     let recovered_shared_key = recover_shared_key_of_filepath(client, user_info, filepath).await?;
-    let permission_ct = add_permission(&new_data_pk, &recovered_shared_key, filepath)?;
+    let permission_ct = gen_read_permission_ct(&new_data_pk, &recovered_shared_key, filepath)?;
 
     // 1. Path table
     let (_, parent_path) = split_filepath(filepath);
@@ -246,10 +276,11 @@ pub async fn add_read_permission(
     new_contents.readable_user_path_ids.push(new_path_id);
     let new_contents_ct =
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
+    let authorization_seed =
+        recover_authorization_seed_of_filepath(client, user_info, filepath).await?;
     client
         .put_contents(
-            &user_info.data_sk,
-            user_info.id,
+            authorization_seed,
             &recovered_shared_key.shared_key_hash,
             &new_contents_ct,
         )
@@ -264,8 +295,8 @@ pub async fn add_write_permission(
     new_user_id: DBInt,
 ) -> Result<()> {
     let recovered_shared_key = recover_shared_key_of_filepath(client, user_info, filepath).await?;
-
-    // 1. Contents table
+    let authorization_seed =
+        recover_authorization_seed_of_filepath(client, user_info, filepath).await?;
     let pre_contents_record = client
         .get_contents(&recovered_shared_key.shared_key_hash)
         .await?;
@@ -280,20 +311,42 @@ pub async fn add_write_permission(
             new_user_path_id = Some(path_id);
         }
     }
-    let new_user_path_id = new_user_path_id.ok_or(anyhow::anyhow!(
+    let new_user_path_id = *new_user_path_id.ok_or(anyhow::anyhow!(
         "For the write permission, the user first needs to have the read permission."
     ))?;
 
+    // 1. Authorization Seed Table
+    let (pk, _) = get_user_public_keys(client, new_user_id).await?;
+    let authorization_seed_ct = encrypt_authorization_seed(&pk, authorization_seed)?;
+    client
+        .post_authorization_seed(
+            &user_info.data_sk,
+            new_user_path_id,
+            new_user_id,
+            &authorization_seed_ct,
+        )
+        .await?;
+
+    // 2. Contents table
     new_contents.num_writeable_users += 1;
-    new_contents.writeable_user_path_ids.push(*new_user_path_id);
+    new_contents.writeable_user_path_ids.push(new_user_path_id);
     let new_contents_ct =
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
     client
         .put_contents(
-            &user_info.data_sk,
-            user_info.id,
+            authorization_seed,
             &recovered_shared_key.shared_key_hash,
             &new_contents_ct,
+        )
+        .await?;
+
+    // 3. Write permission table
+    client
+        .post_write_permission(
+            &user_info.data_sk,
+            user_info.id,
+            new_user_path_id,
+            new_user_id,
         )
         .await?;
     Ok(())
@@ -306,6 +359,8 @@ pub async fn modify_file(
     new_file_bytes: Vec<u8>,
 ) -> Result<()> {
     let recovered_shared_key = recover_shared_key_of_filepath(client, user_info, filepath).await?;
+    let authorization_seed =
+        recover_authorization_seed_of_filepath(client, user_info, filepath).await?;
     let pre_contents_record = client
         .get_contents(&recovered_shared_key.shared_key_hash)
         .await?;
@@ -319,8 +374,7 @@ pub async fn modify_file(
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
     client
         .put_contents(
-            &user_info.data_sk,
-            user_info.id,
+            authorization_seed,
             &recovered_shared_key.shared_key_hash,
             &new_contents_ct,
         )
@@ -378,6 +432,25 @@ async fn recover_shared_key_of_filepath(
     Ok(recovered_shared_key)
 }
 
+async fn recover_authorization_seed_of_filepath(
+    client: &HttpClient,
+    user_info: &SelfUserInfo,
+    filepath: &str,
+) -> Result<AuthorizationSeed> {
+    let path_id = get_path_id_of_filepath(client, user_info, filepath)
+        .await?
+        .ok_or(anyhow::anyhow!(format!(
+            "No file exists for the filepath {}",
+            filepath
+        )))?;
+    let authorization_record = client.get_authorization_key(path_id).await?;
+    let authorization_seed_ct =
+        AuthorizationSeedCT::from_str(&authorization_record.authorization_seed_ct)?;
+    let authorization_seed =
+        decrypt_authorization_seed_ct(&user_info.data_sk, &authorization_seed_ct)?;
+    Ok(authorization_seed)
+}
+
 fn decrypt_filepath_ct_str(ct_str: &str, data_sk: &PkeSecretKey) -> Result<String> {
     let filepath_ct = FilePathCT::from_str(&ct_str)?;
     let filepath = decrypt_filepath_ct(data_sk, &filepath_ct)?;
@@ -405,7 +478,7 @@ mod test {
     use anyhow::Result;
     use httpmock::prelude::*;
     use sommelier_drive_cryptos::{
-        pke_gen_public_key, pke_gen_secret_key, JsonString, PkePublicKey, PkeSecretKey,
+        pke_gen_public_key, pke_gen_secret_key, PemString, PkePublicKey, PkeSecretKey,
     };
     use tokio;
 
@@ -458,7 +531,52 @@ mod test {
         let client = HttpClient::new(server.base_url().as_str(), region_name);
         let user_id = 1;
         let user_info = gen_user_info(user_id)?;
+        let path_id = 2;
+        let parent_filepath = "/root/test";
+        let data_pk = pke_gen_public_key(&user_info.data_sk);
+        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
+        let permission_hash = compute_permission_hash(user_id, parent_filepath);
+        let filepath = parent_filepath.to_string() + "/test.txt";
+        let data_ct = encrypt_filepath(&data_pk, &filepath)?;
+        let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
+            &keyword_pk,
+            region_name,
+            &filepath,
+            &mut rand_core::OsRng,
+        )?;
+        let test_path_record = PathTableRecord {
+            path_id,
+            user_id,
+            permission_hash: permission_hash.to_string(),
+            data_ct: data_ct.to_string(),
+            keyword_ct: serde_json::to_string(&keyword_ct)?,
+        };
 
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path_matches(Regex::new("/file-path/children/[0-f]+").unwrap());
+            then.status(200)
+                .header("content-type", "application/json")
+                .json_body_obj(&[test_path_record]);
+        });
+        let get_filepathes = get_children_pathes(&client, &user_info, parent_filepath).await?;
+        assert_eq!(get_filepathes, vec![filepath]);
+        mock.assert();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn search_descendant_pathes_test() -> Result<()> {
+        let server = MockServer::start_async().await;
+        let region_name = "get_children_pathes_test";
+        let client = HttpClient::new(server.base_url().as_str(), region_name);
+        let user_id = 1;
+        let user_info = gen_user_info(user_id)?;
+        let path_id = 2;
+        let parent_filepath = "/root/test";
+        let data_pk = pke_gen_public_key(&user_info.data_sk);
+        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
         Ok(())
     }
 

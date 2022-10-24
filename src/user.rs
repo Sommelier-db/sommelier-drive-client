@@ -3,7 +3,7 @@ use crate::types::*;
 use aes_gcm::aead;
 use anyhow::Result;
 use sommelier_drive_cryptos::{
-    pke_gen_public_key, pke_gen_secret_key, JsonString, PkePublicKey, PkeSecretKey,
+    pke_gen_public_key, pke_gen_secret_key, PemString, PkePublicKey, PkeSecretKey,
 };
 
 #[derive(Debug, Clone)]
@@ -44,7 +44,7 @@ mod test {
     use aes_gcm::aead;
     use anyhow::Result;
     use httpmock::prelude::*;
-    use sommelier_drive_cryptos::{pke_gen_public_key, pke_gen_secret_key, JsonString};
+    use sommelier_drive_cryptos::{pke_gen_public_key, pke_gen_secret_key, PemString};
     use tokio;
 
     #[tokio::test]
@@ -83,7 +83,8 @@ mod test {
         let client = HttpClient::new(server.base_url().as_str(), region_name);
         let mock = server.mock(|when, then| {
             when.method(GET)
-                .path_matches(Regex::new("/user/[0-9]+").unwrap());
+                .path_matches(Regex::new("/user").unwrap())
+                .header("content-type", "application/json");
             then.status(200)
                 .header("content-type", "application/json")
                 .json_body_obj(&UserTableRecord {

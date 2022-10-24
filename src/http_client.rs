@@ -1,6 +1,9 @@
-use crate::types::{
-    ContentsTableReocrd, DBInt, KeywordCT, KeywordPK, PathTableRecord, SharedKeyTableRecord,
-    Trapdoor, UserTableRecord,
+use crate::{
+    types::{
+        ContentsTableReocrd, DBInt, KeywordCT, KeywordPK, PathTableRecord, SharedKeyTableRecord,
+        Trapdoor, UserTableRecord,
+    },
+    AuthorizationSeedTableRecord, WritePermissionTableRecord,
 };
 use aes_gcm::aead::OsRng;
 use anyhow::Result;
@@ -11,7 +14,8 @@ use reqwest_wasm::{
 };
 use serde_json;
 use sommelier_drive_cryptos::{
-    gen_signature, FilePathCT, HashDigest, HexString, JsonString, PkePublicKey, PkeSecretKey,
+    gen_signature, pke_derive_secret_key_from_seeed, pke_gen_public_key, AuthorizationSeed,
+    AuthorizationSeedCT, FilePathCT, HashDigest, HexString, PemString, PkePublicKey, PkeSecretKey,
 };
 use std::collections::{BTreeMap, HashMap};
 
@@ -30,8 +34,14 @@ impl HttpClient {
     }
 
     pub async fn get_user(&self, user_id: DBInt) -> Result<UserTableRecord> {
-        let url = self.base_url.to_string() + "/user/" + &user_id.to_string();
-        let record = reqwest_wasm::get(&url)
+        let url = self.base_url.to_string() + "/user";
+        let client = reqwest_wasm::Client::new();
+        let mut map = HashMap::<&str, String>::new();
+        map.insert("userId", user_id.to_string());
+        let record = client
+            .get(url)
+            .json(&map)
+            .send()
             .await?
             .json::<UserTableRecord>()
             .await?;
@@ -41,17 +51,23 @@ impl HttpClient {
     pub async fn post_user(&self, data_pk: &PkePublicKey, keyword_pk: &KeywordPK) -> Result<DBInt> {
         let url = self.base_url.to_string() + "/user";
         let client = reqwest_wasm::Client::new();
-        let mut map = HashMap::<String, String>::new();
-        map.insert("dataPK".to_string(), data_pk.to_string()?);
-        map.insert("keywordPK".to_string(), serde_json::to_string(&keyword_pk)?);
+        let mut map = HashMap::<&str, String>::new();
+        map.insert("dataPK", data_pk.to_string()?);
+        map.insert("keywordPK", serde_json::to_string(&keyword_pk)?);
         let res = client.post(url).json(&map).send().await?;
         let text = res.text().await?;
         Ok(DBInt::from_str_radix(&text, 10)?)
     }
 
     pub async fn get_filepath(&self, path_id: DBInt) -> Result<PathTableRecord> {
-        let url = self.base_url.to_string() + "/file-path/" + path_id.to_string().as_ref();
-        let record = reqwest_wasm::get(&url)
+        let url = self.base_url.to_string() + "/file-path";
+        let client = reqwest_wasm::Client::new();
+        let mut map = HashMap::<&str, String>::new();
+        map.insert("pathId", path_id.to_string());
+        let record = client
+            .get(&url)
+            .json(&map)
+            .send()
             .await?
             .json::<PathTableRecord>()
             .await?;
@@ -62,9 +78,14 @@ impl HttpClient {
         &self,
         permission_hash: &HashDigest,
     ) -> Result<Vec<PathTableRecord>> {
-        let permission_hash_str: String = permission_hash.to_string();
-        let url = self.base_url.to_string() + "/file-path/children/" + &permission_hash_str;
-        let records = reqwest_wasm::get(&url)
+        let url = self.base_url.to_string() + "/file-path/children";
+        let client = reqwest_wasm::Client::new();
+        let mut map = HashMap::<&str, String>::new();
+        map.insert("permissionHash", permission_hash.to_string());
+        let records = client
+            .get(&url)
+            .json(&map)
+            .send()
             .await?
             .json::<Vec<PathTableRecord>>()
             .await?;
@@ -76,12 +97,18 @@ impl HttpClient {
         user_id: DBInt,
         td: &Trapdoor,
     ) -> Result<Vec<PathTableRecord>> {
-        let url = self.base_url.to_string() + "/file-path/search/" + &user_id.to_string();
+        let url = self.base_url.to_string() + "/file-path/search";
         let client = reqwest_wasm::Client::new();
         let mut map = HashMap::new();
-        map.insert("trapdoor".to_string(), serde_json::to_string(td)?);
-        let res = client.get(url).json(&map).send().await?;
-        let records = res.json::<Vec<PathTableRecord>>().await?;
+        map.insert("userId", user_id.to_string());
+        map.insert("trapdoor", serde_json::to_string(td)?);
+        let records = client
+            .get(url)
+            .json(&map)
+            .send()
+            .await?
+            .json::<Vec<PathTableRecord>>()
+            .await?;
         Ok(records)
     }
 
@@ -117,16 +144,9 @@ impl HttpClient {
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);
+        let nonce = self.get_nonce_of_user_id(write_user_id).await?;
         let res = self
-            .attach_signature(
-                sk,
-                req_without_auth,
-                "POST",
-                &url,
-                write_user_id,
-                map_for_sign,
-            )
-            .await?
+            .attach_signature(sk, req_without_auth, "POST", &url, nonce, map_for_sign)?
             .send()
             .await?;
         let text = res.text().await?;
@@ -134,8 +154,14 @@ impl HttpClient {
     }
 
     pub async fn get_shared_key(&self, path_id: DBInt) -> Result<SharedKeyTableRecord> {
-        let url = self.base_url.to_string() + "/shared-key/?path-id=" + &path_id.to_string();
-        let record = reqwest_wasm::get(&url)
+        let url = self.base_url.to_string() + "/shared-key";
+        let client = reqwest_wasm::Client::new();
+        let mut map = HashMap::<&str, String>::new();
+        map.insert("pathId", path_id.to_string());
+        let record = client
+            .get(&url)
+            .json(&map)
+            .send()
             .await?
             .json::<SharedKeyTableRecord>()
             .await?;
@@ -149,7 +175,7 @@ impl HttpClient {
         write_user_id: DBInt,
         shared_key_ct: &[u8],
     ) -> Result<DBInt> {
-        let url = self.base_url.to_string() + "/shared-key/" + &path_id.to_string();
+        let url = self.base_url.to_string() + "/shared-key";
         let client = reqwest_wasm::Client::new();
 
         let write_user_id_str = write_user_id.to_string();
@@ -168,16 +194,62 @@ impl HttpClient {
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);
+        let nonce = self.get_nonce_of_user_id(write_user_id).await?;
         let res = self
-            .attach_signature(
-                sk,
-                req_without_auth,
-                "POST",
-                &url,
-                write_user_id,
-                map_for_sign,
-            )
+            .attach_signature(sk, req_without_auth, "POST", &url, nonce, map_for_sign)?
+            .send()
+            .await?;
+        let text = res.text().await?;
+        Ok(DBInt::from_str_radix(&text, 10)?)
+    }
+
+    pub async fn get_authorization_key(
+        &self,
+        path_id: DBInt,
+    ) -> Result<AuthorizationSeedTableRecord> {
+        let url = self.base_url.to_string() + "/authorization-seed";
+        let client = reqwest_wasm::Client::new();
+        let mut map = HashMap::<&str, String>::new();
+        map.insert("pathId", path_id.to_string());
+        let record = client
+            .get(&url)
+            .json(&map)
+            .send()
             .await?
+            .json::<AuthorizationSeedTableRecord>()
+            .await?;
+        Ok(record)
+    }
+
+    pub async fn post_authorization_seed(
+        &self,
+        sk: &PkeSecretKey,
+        path_id: DBInt,
+        write_user_id: DBInt,
+        authorization_seed_ct: &AuthorizationSeedCT,
+    ) -> Result<DBInt> {
+        let url = self.base_url.to_string() + "/authorization-seed";
+        let client = reqwest_wasm::Client::new();
+
+        let write_user_id_str = write_user_id.to_string();
+        let path_id_str = path_id.to_string();
+        let ct_str = authorization_seed_ct.to_string();
+
+        let mut map_for_post = HashMap::new();
+        let mut map_for_sign = BTreeMap::new();
+        for (key, val) in [
+            ("writeUserId", write_user_id_str.as_str()),
+            ("pathId", path_id_str.as_str()),
+            ("ct", ct_str.as_str()),
+        ] {
+            map_for_post.insert(key, val);
+            map_for_sign.insert(key, val);
+        }
+
+        let req_without_auth = client.post(&url).json(&map_for_post);
+        let nonce = self.get_nonce_of_user_id(write_user_id).await?;
+        let res = self
+            .attach_signature(sk, req_without_auth, "POST", &url, nonce, map_for_sign)?
             .send()
             .await?;
         let text = res.text().await?;
@@ -185,11 +257,14 @@ impl HttpClient {
     }
 
     pub async fn get_contents(&self, shared_key_hash: &HashDigest) -> Result<ContentsTableReocrd> {
-        let shared_key_hash_str: String = shared_key_hash.to_string();
-        let url = self.base_url.to_string()
-            + "/contents/?shared-key-hash="
-            + shared_key_hash_str.as_str();
-        let record = reqwest_wasm::get(&url)
+        let url = self.base_url.to_string() + "/contents";
+        let client = reqwest_wasm::Client::new();
+        let mut map = HashMap::<&str, String>::new();
+        map.insert("sharedKeyHash", shared_key_hash.to_string());
+        let record = client
+            .get(&url)
+            .json(&map)
+            .send()
             .await?
             .json::<ContentsTableReocrd>()
             .await?;
@@ -198,23 +273,24 @@ impl HttpClient {
 
     pub async fn post_contents(
         &self,
-        sk: &PkeSecretKey,
-        write_user_id: DBInt,
+        authorization_seed: AuthorizationSeed,
         shared_key_hash: &HashDigest,
         contents_ct: &[u8],
     ) -> Result<DBInt> {
         let url = self.base_url.to_string() + "/contents";
         let client = reqwest_wasm::Client::new();
 
-        let write_user_id_str = write_user_id.to_string();
-        let shared_key_hash_str: String = shared_key_hash.to_string();
+        let authorization_sk = pke_derive_secret_key_from_seeed(authorization_seed)?;
+        let authorization_pk = pke_gen_public_key(&authorization_sk);
+        let shared_key_hash_str = shared_key_hash.to_string();
+        let pk_str = authorization_pk.to_string()?;
         let ct_str = hex::encode(contents_ct);
 
         let mut map_for_post = HashMap::new();
         let mut map_for_sign = BTreeMap::new();
         for (key, val) in [
-            ("writeUserId", write_user_id_str.as_str()),
             ("sharedKeyHash", shared_key_hash_str.as_str()),
+            ("authorizationPK", pk_str.as_str()),
             ("ct", ct_str.as_str()),
         ] {
             map_for_post.insert(key, val);
@@ -222,16 +298,16 @@ impl HttpClient {
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);
+
         let res = self
             .attach_signature(
-                sk,
+                &authorization_sk,
                 req_without_auth,
                 "POST",
                 &url,
-                write_user_id,
+                0,
                 map_for_sign,
-            )
-            .await?
+            )?
             .send()
             .await?;
         let text = res.text().await?;
@@ -240,24 +316,22 @@ impl HttpClient {
 
     pub async fn put_contents(
         &self,
-        sk: &PkeSecretKey,
-        write_user_id: DBInt,
+        authorization_seed: AuthorizationSeed,
         shared_key_hash: &HashDigest,
         contents_ct: &[u8],
     ) -> Result<DBInt> {
-        let shared_key_hash_str: String = shared_key_hash.to_string();
-        let url = self.base_url.to_string()
-            + "/contents/?shared-key-hash="
-            + shared_key_hash_str.as_str();
+        let url = self.base_url.to_string() + "/contents";
         let client = reqwest_wasm::Client::new();
 
-        let write_user_id_str = write_user_id.to_string();
+        let authorization_sk = pke_derive_secret_key_from_seeed(authorization_seed)?;
+        let authorization_pk = pke_gen_public_key(&authorization_sk);
+        let shared_key_hash_str = shared_key_hash.to_string();
         let ct_str = hex::encode(contents_ct);
 
         let mut map_for_post = HashMap::new();
         let mut map_for_sign = BTreeMap::new();
         for (key, val) in [
-            ("writeUserId", write_user_id_str.as_str()),
+            ("sharedKeyHash", shared_key_hash_str.as_str()),
             ("ct", ct_str.as_str()),
         ] {
             map_for_post.insert(key, val);
@@ -265,34 +339,88 @@ impl HttpClient {
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);
+        let pre_record = self.get_contents(shared_key_hash).await?;
+        let nonce = pre_record.nonce;
         let res = self
             .attach_signature(
-                sk,
+                &authorization_sk,
                 req_without_auth,
                 "PUT",
                 &url,
-                write_user_id,
+                nonce,
                 map_for_sign,
-            )
-            .await?
+            )?
             .send()
             .await?;
         let text = res.text().await?;
         Ok(DBInt::from_str_radix(&text, 10)?)
     }
 
-    async fn attach_signature(
+    pub async fn get_write_permission(&self, path_id: DBInt) -> Result<WritePermissionTableRecord> {
+        let url = self.base_url.to_string() + "/write-permission";
+        let client = reqwest_wasm::Client::new();
+        let mut map = HashMap::<&str, String>::new();
+        map.insert("pathId", path_id.to_string());
+        let record = client
+            .get(&url)
+            .json(&map)
+            .send()
+            .await?
+            .json::<WritePermissionTableRecord>()
+            .await?;
+        Ok(record)
+    }
+
+    pub async fn post_write_permission(
+        &self,
+        sk: &PkeSecretKey,
+        write_user_id: DBInt,
+        path_id: DBInt,
+        user_id: DBInt,
+    ) -> Result<DBInt> {
+        let url = self.base_url.to_string() + "/write-permission";
+        let client = reqwest_wasm::Client::new();
+
+        let write_user_id_str = write_user_id.to_string();
+        let path_id_str = path_id.to_string();
+        let user_id_str = user_id.to_string();
+
+        let mut map_for_post = HashMap::new();
+        let mut map_for_sign = BTreeMap::new();
+        for (key, val) in [
+            ("writeUserId", write_user_id_str.as_str()),
+            ("pathId", path_id_str.as_str()),
+            ("userId", user_id_str.as_str()),
+        ] {
+            map_for_post.insert(key, val);
+            map_for_sign.insert(key, val);
+        }
+
+        let req_without_auth = client.post(&url).json(&map_for_post);
+        let nonce = self.get_nonce_of_user_id(write_user_id).await?;
+        let res = self
+            .attach_signature(sk, req_without_auth, "POST", &url, nonce, map_for_sign)?
+            .send()
+            .await?;
+        let text = res.text().await?;
+        Ok(DBInt::from_str_radix(&text, 10)?)
+    }
+
+    async fn get_nonce_of_user_id(&self, user_id: DBInt) -> Result<DBInt> {
+        let record = self.get_user(user_id).await?;
+        Ok(record.nonce)
+    }
+
+    fn attach_signature(
         &self,
         sk: &PkeSecretKey,
         request_builder: RequestBuilder,
         method: &str,
         url: &str,
-        user_id: DBInt,
+        nonce: DBInt,
         map_for_sign: BTreeMap<&str, &str>,
     ) -> Result<RequestBuilder> {
         let mut rng = OsRng;
-        let my_record = self.get_user(user_id).await?;
-        let nonce = my_record.nonce;
         let signature = gen_signature(
             sk,
             &self.region_name,

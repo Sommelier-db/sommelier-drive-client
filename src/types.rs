@@ -36,18 +36,27 @@ pub struct SharedKeyTableRecord {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AuthorizationSeedTableRecord {
+    pub(crate) authorization_seed_id: DBInt,
+    pub(crate) path_id: DBInt,
+    pub(crate) authorization_seed_ct: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ContentsTableReocrd {
     pub(crate) contents_id: DBInt,
     pub(crate) shared_key_hash: String,
+    pub(crate) authorization_pk: String,
+    pub(crate) nonce: DBInt,
     pub(crate) contents_ct: String,
 }
 
-/*#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WritePermissionTableRecord {
-    pub(crate) write_permission_id: DBInt,
+    pub(crate) w_permission_id: DBInt,
     pub(crate) path_id: DBInt,
     pub(crate) user_id: DBInt,
-}*/
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContentsData {
