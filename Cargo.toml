@@ -28,6 +28,7 @@ tokio = {version = "1.21.2", features = ["rt", "rt-multi-thread"], optional = tr
 
 [dev-dependencies]
 tokio = {version = "1.21.2", features = ["macros"]}
+httpmock = "0.6.6"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -35,3 +36,6 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = ["c_api"]
 c_api = ["easy_ffi", "errno", "tokio"]
+
+[profile.test] 
+opt-level = 3
