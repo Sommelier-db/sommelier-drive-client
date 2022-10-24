@@ -249,6 +249,37 @@ pub async fn add_read_permission(
     Ok(())
 }
 
+pub async fn add_write_permission(
+    client: &HttpClient,
+    user_info: &SelfUserInfo,
+    filepath: &str,
+    new_user_id: DBInt,
+) -> Result<()> {
+    let recovered_shared_key = recover_shared_key_of_filepath(client, user_info, filepath).await?;
+
+    // 1. Contents table
+    let pre_contents_record = client
+        .get_contents(&recovered_shared_key.shared_key_hash)
+        .await?;
+    let mut new_contents = decrypt_contents_ct_str(
+        &pre_contents_record.contents_ct.to_string(),
+        &recovered_shared_key.shared_key,
+    )?;
+    new_contents.num_writeable_users += 1;
+    new_contents.writeable_user_ids.push(new_user_id);
+    let new_contents_ct =
+        encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
+    client
+        .put_contents(
+            &user_info.data_sk,
+            user_info.id,
+            &recovered_shared_key.shared_key_hash,
+            &new_contents_ct,
+        )
+        .await?;
+    Ok(())
+}
+
 pub async fn modify_file(
     client: &HttpClient,
     user_info: &SelfUserInfo,
@@ -278,11 +309,11 @@ pub async fn modify_file(
     Ok(())
 }
 
-async fn recover_shared_key_of_filepath(
+async fn get_path_id_of_filepath(
     client: &HttpClient,
     user_info: &SelfUserInfo,
     filepath: &str,
-) -> Result<RecoveredSharedKey> {
+) -> Result<DBInt> {
     let (_, parent_filepath) = split_filepath(filepath);
     let permission_hash = compute_permission_hash(user_info.id, &parent_filepath);
     let records = client.get_children_file_pathes(&permission_hash).await?;
@@ -300,6 +331,15 @@ async fn recover_shared_key_of_filepath(
             "No file exists for the filepath {}",
             filepath
         )))?;
+    Ok(path_id)
+}
+
+async fn recover_shared_key_of_filepath(
+    client: &HttpClient,
+    user_info: &SelfUserInfo,
+    filepath: &str,
+) -> Result<RecoveredSharedKey> {
+    let path_id = get_path_id_of_filepath(client, user_info, filepath).await?;
 
     /*
     let mut rng = rand_core::OsRng;

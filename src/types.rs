@@ -16,6 +16,7 @@ pub struct UserTableRecord {
     pub(crate) user_id: DBInt,
     pub(crate) data_pk: String,
     pub(crate) keyword_pk: String,
+    pub(crate) nonce: DBInt,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -111,7 +111,15 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(sk, req_without_auth, "POST", &url, map_for_sign)?
+            .attach_signature(
+                sk,
+                req_without_auth,
+                "POST",
+                &url,
+                write_user_id,
+                map_for_sign,
+            )
+            .await?
             .send()
             .await?;
         let text = res.text().await?;
@@ -154,7 +162,15 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(sk, req_without_auth, "POST", &url, map_for_sign)?
+            .attach_signature(
+                sk,
+                req_without_auth,
+                "POST",
+                &url,
+                write_user_id,
+                map_for_sign,
+            )
+            .await?
             .send()
             .await?;
         let text = res.text().await?;
@@ -200,7 +216,15 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(sk, req_without_auth, "POST", &url, map_for_sign)?
+            .attach_signature(
+                sk,
+                req_without_auth,
+                "POST",
+                &url,
+                write_user_id,
+                map_for_sign,
+            )
+            .await?
             .send()
             .await?;
         let text = res.text().await?;
@@ -235,7 +259,15 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(sk, req_without_auth, "PUT", &url, map_for_sign)?
+            .attach_signature(
+                sk,
+                req_without_auth,
+                "PUT",
+                &url,
+                write_user_id,
+                map_for_sign,
+            )
+            .await?
             .send()
             .await?;
         let text = res.text().await?;
@@ -280,23 +312,42 @@ impl HttpClient {
 
         let req_without_auth = client.post(&url).json(&map_for_post);
         let res = self
-            .attach_signature(sk, req_without_auth, "POST", &url, map_for_sign)?
+            .attach_signature(
+                sk,
+                req_without_auth,
+                "POST",
+                &url,
+                write_user_id,
+                map_for_sign,
+            )
+            .await?
             .send()
             .await?;
         let text = res.text().await?;
         Ok(DBInt::from_str_radix(&text, 10)?)
     }
 
-    fn attach_signature(
+    async fn attach_signature(
         &self,
         sk: &PkeSecretKey,
         request_builder: RequestBuilder,
         method: &str,
         url: &str,
+        user_id: DBInt,
         map_for_sign: BTreeMap<&str, &str>,
     ) -> Result<RequestBuilder> {
         let mut rng = OsRng;
-        let signature = gen_signature(sk, &self.region_name, method, url, map_for_sign, &mut rng);
+        let my_record = self.get_user(user_id).await?;
+        let nonce = my_record.nonce;
+        let signature = gen_signature(
+            sk,
+            &self.region_name,
+            method,
+            url,
+            nonce,
+            map_for_sign,
+            &mut rng,
+        );
         let mut header_val = HeaderValue::from_str(&hex::encode(signature))?;
         header_val.set_sensitive(true);
         Ok(request_builder.header(AUTHORIZATION, header_val))
