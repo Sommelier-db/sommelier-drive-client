@@ -49,7 +49,7 @@ impl HttpClient {
         Ok(DBInt::from_str_radix(&text, 10)?)
     }
 
-    pub async fn get_file_path(&self, path_id: DBInt) -> Result<PathTableRecord> {
+    pub async fn get_filepath(&self, path_id: DBInt) -> Result<PathTableRecord> {
         let url = self.base_url.to_string() + "/file-path/" + path_id.to_string().as_ref();
         let record = reqwest_wasm::get(&url)
             .await?

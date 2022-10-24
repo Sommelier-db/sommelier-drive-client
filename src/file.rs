@@ -14,7 +14,7 @@ pub async fn get_filepath_with_id(
     user_info: &SelfUserInfo,
     path_id: DBInt,
 ) -> Result<String> {
-    let record = client.get_file_path(path_id).await?;
+    let record = client.get_filepath(path_id).await?;
     Ok(decrypt_filepath_ct_str(
         &record.data_ct,
         &user_info.data_sk,
@@ -130,7 +130,7 @@ async fn add_contents_generic(
 
     for i in 0..num_readable_users {
         let path_record = client
-            .get_file_path(new_contents_data.readable_user_path_ids[i])
+            .get_filepath(new_contents_data.readable_user_path_ids[i])
             .await?;
         readbale_user_ids.push(path_record.user_id);
         let (data_pk, keyword_pk) = get_user_public_keys(client, path_record.user_id).await?;
@@ -275,7 +275,7 @@ pub async fn add_write_permission(
     )?;
     let mut new_user_path_id = None;
     for path_id in new_contents.readable_user_path_ids.iter() {
-        let path_record = client.get_file_path(*path_id).await?;
+        let path_record = client.get_filepath(*path_id).await?;
         if path_record.user_id == new_user_id {
             new_user_path_id = Some(path_id);
         }
@@ -396,4 +396,81 @@ fn split_filepath(filepath: &str) -> (String, String) {
     let filename = path_split[path_split.len() - 1];
     let dir_name = path_split[0..(path_split.len() - 2)].concat();
     (filename.to_string(), dir_name)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aes_gcm::aead;
+    use anyhow::Result;
+    use httpmock::prelude::*;
+    use sommelier_drive_cryptos::{
+        pke_gen_public_key, pke_gen_secret_key, JsonString, PkePublicKey, PkeSecretKey,
+    };
+    use tokio;
+
+    #[tokio::test]
+    async fn get_filepath_with_id_test() -> Result<()> {
+        let server = MockServer::start_async().await;
+        let region_name = "get_filepath_with_id";
+        let client = HttpClient::new(server.base_url().as_str(), region_name);
+        let user_id = 1;
+        let user_info = gen_user_info(user_id)?;
+
+        let path_id = 2;
+        let filepath = "/root/test/test.txt";
+        let (_, parent_filepath) = split_filepath(filepath);
+        let permission_hash = compute_permission_hash(user_id, &parent_filepath);
+        let data_pk = pke_gen_public_key(&user_info.data_sk);
+        let data_ct = encrypt_filepath(&data_pk, filepath)?;
+        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
+        let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
+            &keyword_pk,
+            region_name,
+            filepath,
+            &mut rand_core::OsRng,
+        )?;
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path_matches(Regex::new("/file-path/[0-9]+").unwrap());
+            then.status(200)
+                .header("content-type", "application/json")
+                .json_body_obj(&PathTableRecord {
+                    path_id,
+                    user_id,
+                    permission_hash: permission_hash.to_string(),
+                    data_ct: data_ct.to_string(),
+                    keyword_ct: serde_json::to_string(&keyword_ct).unwrap(),
+                });
+        });
+
+        let get_filepath = get_filepath_with_id(&client, &user_info, path_id).await?;
+        assert_eq!(filepath, get_filepath);
+        mock.assert();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_children_pathes_test() -> Result<()> {
+        let server = MockServer::start_async().await;
+        let region_name = "get_children_pathes_test";
+        let client = HttpClient::new(server.base_url().as_str(), region_name);
+        let user_id = 1;
+        let user_info = gen_user_info(user_id)?;
+
+        Ok(())
+    }
+
+    fn gen_user_info(user_id: DBInt) -> Result<SelfUserInfo> {
+        let mut rng1 = aead::OsRng;
+        let data_sk = pke_gen_secret_key(&mut rng1)?;
+        let mut rng2 = rand_core::OsRng;
+        let keyword_sk = KeywordSK::gen(&mut rng2, MAX_NUM_KEYWORD);
+        Ok(SelfUserInfo {
+            id: user_id,
+            data_sk,
+            keyword_sk,
+        })
+    }
 }

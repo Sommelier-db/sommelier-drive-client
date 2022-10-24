@@ -44,13 +44,28 @@ mod test {
     use aes_gcm::aead;
     use anyhow::Result;
     use httpmock::prelude::*;
-    use sommelier_drive_cryptos::{
-        pke_gen_public_key, pke_gen_secret_key, JsonString, PkePublicKey, PkeSecretKey,
-    };
+    use sommelier_drive_cryptos::{pke_gen_public_key, pke_gen_secret_key, JsonString};
     use tokio;
 
     #[tokio::test]
-    async fn register_user() {}
+    async fn register_user_test() -> Result<()> {
+        let server = MockServer::start_async().await;
+        let region_name = "register_user_test";
+        let client = HttpClient::new(server.base_url().as_str(), region_name);
+        let user_id = 1;
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path_matches(Regex::new("/user").unwrap())
+                .header("content-type", "application/json");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(user_id.to_string());
+        });
+        let user_info = register_user(&client).await?;
+        assert_eq!(user_info.id, user_id);
+        mock.assert();
+        Ok(())
+    }
 
     #[tokio::test]
     async fn get_user_test() -> Result<()> {
@@ -64,7 +79,9 @@ mod test {
         let nonce = 1;
 
         let server = MockServer::start_async().await;
-        server.mock(|when, then| {
+        let region_name = "get_user_test";
+        let client = HttpClient::new(server.base_url().as_str(), region_name);
+        let mock = server.mock(|when, then| {
             when.method(GET)
                 .path_matches(Regex::new("/user/[0-9]+").unwrap());
             then.status(200)
@@ -76,14 +93,13 @@ mod test {
                     nonce,
                 });
         });
-        let region_name = "get_user_test";
-        let client = HttpClient::new(server.base_url().as_str(), region_name);
         let (data_pk2, keyword_pk2) = get_user_public_keys(&client, user_id).await?;
         assert_eq!(data_pk.to_string()?, data_pk2.to_string()?);
         assert_eq!(
             serde_json::to_string(&keyword_pk).unwrap(),
             serde_json::to_string(&keyword_pk2).unwrap()
         );
+        mock.assert();
         Ok(())
     }
 }
