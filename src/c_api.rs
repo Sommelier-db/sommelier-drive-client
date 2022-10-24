@@ -272,18 +272,18 @@ pub struct CContentsData {
     is_file: c_int,
     num_readable_users: usize,
     num_writeable_users: usize,
-    readable_user_ids: *mut u64,
-    writeable_user_ids: *mut u64,
+    readable_user_path_ids: *mut u64,
+    writeable_user_path_ids: *mut u64,
     file_bytes_ptr: *const u8,
     file_bytes_len: usize,
 }
 
 impl From<ContentsData> for CContentsData {
     fn from(mut value: ContentsData) -> Self {
-        let readable_user_ids_ptr = value.readable_user_ids.as_mut_ptr();
-        mem::forget(value.readable_user_ids);
-        let writeable_user_ids_ptr = value.writeable_user_ids.as_mut_ptr();
-        mem::forget(value.writeable_user_ids);
+        let readable_user_path_ids_ptr = value.readable_user_path_ids.as_mut_ptr();
+        mem::forget(value.readable_user_path_ids);
+        let writeable_user_path_ids_ptr = value.writeable_user_path_ids.as_mut_ptr();
+        mem::forget(value.writeable_user_path_ids);
         let file_bytes_ptr = value.file_bytes.as_ptr();
         let file_bytes_len = value.file_bytes.len();
         mem::forget(value.file_bytes);
@@ -291,8 +291,8 @@ impl From<ContentsData> for CContentsData {
             is_file: if value.is_file { 1 } else { 0 },
             num_readable_users: value.num_readable_users,
             num_writeable_users: value.num_writeable_users,
-            readable_user_ids: readable_user_ids_ptr,
-            writeable_user_ids: writeable_user_ids_ptr,
+            readable_user_path_ids: readable_user_path_ids_ptr,
+            writeable_user_path_ids: writeable_user_path_ids_ptr,
             file_bytes_ptr,
             file_bytes_len,
         }
@@ -301,20 +301,21 @@ impl From<ContentsData> for CContentsData {
 
 impl Into<ContentsData> for CContentsData {
     fn into(self) -> ContentsData {
-        let readable_user_ids =
-            unsafe { slice::from_raw_parts(self.readable_user_ids, self.num_readable_users) }
+        let readable_user_path_ids =
+            unsafe { slice::from_raw_parts(self.readable_user_path_ids, self.num_readable_users) }
                 .to_vec();
-        let writeable_user_ids =
-            unsafe { slice::from_raw_parts(self.writeable_user_ids, self.num_writeable_users) }
-                .to_vec();
+        let writeable_user_path_ids = unsafe {
+            slice::from_raw_parts(self.writeable_user_path_ids, self.num_writeable_users)
+        }
+        .to_vec();
         let file_bytes =
             unsafe { slice::from_raw_parts(self.file_bytes_ptr, self.file_bytes_len) }.to_vec();
         ContentsData {
             is_file: self.is_file == 1,
             num_readable_users: self.num_readable_users,
             num_writeable_users: self.num_writeable_users,
-            readable_user_ids,
-            writeable_user_ids,
+            readable_user_path_ids,
+            writeable_user_path_ids,
             file_bytes,
         }
     }
@@ -327,8 +328,8 @@ easy_ffi!(fn_contents_data =>
             is_file: -1,
             num_readable_users: 0,
             num_writeable_users: 0,
-            readable_user_ids: ptr::null_mut(),
-            writeable_user_ids: ptr::null_mut(),
+            readable_user_path_ids: ptr::null_mut(),
+            writeable_user_path_ids: ptr::null_mut(),
             file_bytes_ptr: ptr::null(),
             file_bytes_len: 0,
         };

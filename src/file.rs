@@ -111,24 +111,29 @@ async fn add_contents_generic(
     file_bytes: Vec<u8>,
 ) -> Result<()> {
     let cur_dir_contents = open_filepath(client, user_info, cur_dir).await?;
-    let readable_user_ids = cur_dir_contents.readable_user_ids;
-    let writeable_user_ids = cur_dir_contents.writeable_user_ids;
-    let num_readable_users = readable_user_ids.len();
-    let num_writeable_users = writeable_user_ids.len();
+    let readable_user_path_ids = cur_dir_contents.readable_user_path_ids;
+    let writeable_user_path_ids = cur_dir_contents.writeable_user_path_ids;
+    let num_readable_users = readable_user_path_ids.len();
+    let num_writeable_users = writeable_user_path_ids.len();
     let filepath = cur_dir.to_string() + "/" + filename;
     let new_contents_data = ContentsData {
         is_file,
         num_readable_users,
         num_writeable_users,
-        readable_user_ids,
-        writeable_user_ids,
+        readable_user_path_ids,
+        writeable_user_path_ids,
         file_bytes,
     };
+    let mut readbale_user_ids = Vec::with_capacity(num_readable_users);
     let mut data_pks = Vec::with_capacity(num_readable_users);
     let mut keyword_pks = Vec::with_capacity(num_readable_users);
+
     for i in 0..num_readable_users {
-        let (data_pk, keyword_pk) =
-            get_user_public_keys(client, new_contents_data.readable_user_ids[i]).await?;
+        let path_record = client
+            .get_file_path(new_contents_data.readable_user_path_ids[i])
+            .await?;
+        readbale_user_ids.push(path_record.user_id);
+        let (data_pk, keyword_pk) = get_user_public_keys(client, path_record.user_id).await?;
         data_pks.push(data_pk);
         keyword_pks.push(keyword_pk);
     }
@@ -139,7 +144,7 @@ async fn add_contents_generic(
     let write_user_id = user_info.id;
 
     // 1. Path table
-    let mut path_id_of_user_id = HashMap::new();
+    let mut new_path_id_of_user_id = HashMap::new();
     for i in 0..num_readable_users {
         let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
             &keyword_pks[i],
@@ -147,7 +152,7 @@ async fn add_contents_generic(
             &filepath,
             &mut rng,
         )?;
-        let read_user_id = new_contents_data.readable_user_ids[i];
+        let read_user_id = readbale_user_ids[i];
         let permission_hash = compute_permission_hash(read_user_id, cur_dir);
         let path_id = client
             .post_file_path(
@@ -159,17 +164,17 @@ async fn add_contents_generic(
                 &keyword_ct,
             )
             .await?;
-        path_id_of_user_id.insert(read_user_id, path_id);
+        new_path_id_of_user_id.insert(read_user_id, path_id);
     }
 
     // 2. Shared key table
     for i in 0..num_readable_users {
-        let read_user_id = new_contents_data.readable_user_ids[i];
+        let read_user_id = readbale_user_ids[i];
         let shared_key_ct = &file_ct.shared_key_cts[i];
         client
             .post_shared_key(
                 data_sk,
-                path_id_of_user_id[&read_user_id],
+                new_path_id_of_user_id[&read_user_id],
                 write_user_id,
                 shared_key_ct,
             )
@@ -238,7 +243,7 @@ pub async fn add_read_permission(
         &recovered_shared_key.shared_key,
     )?;
     new_contents.num_readable_users += 1;
-    new_contents.readable_user_ids.push(new_user_id);
+    new_contents.readable_user_path_ids.push(new_path_id);
     let new_contents_ct =
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
     client
@@ -268,8 +273,19 @@ pub async fn add_write_permission(
         &pre_contents_record.contents_ct.to_string(),
         &recovered_shared_key.shared_key,
     )?;
+    let mut new_user_path_id = None;
+    for path_id in new_contents.readable_user_path_ids.iter() {
+        let path_record = client.get_file_path(*path_id).await?;
+        if path_record.user_id == new_user_id {
+            new_user_path_id = Some(path_id);
+        }
+    }
+    let new_user_path_id = new_user_path_id.ok_or(anyhow::anyhow!(
+        "For the write permission, the user first needs to have the read permission."
+    ))?;
+
     new_contents.num_writeable_users += 1;
-    new_contents.writeable_user_ids.push(new_user_id);
+    new_contents.writeable_user_path_ids.push(*new_user_path_id);
     let new_contents_ct =
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
     client
