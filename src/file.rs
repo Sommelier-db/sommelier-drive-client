@@ -202,8 +202,6 @@ async fn add_contents_generic(
     }
 
     // 4. Contents table
-    let authorization_sk = pke_derive_secret_key_from_seeed(authorization_seed)?;
-    let authorization_pk = pke_gen_public_key(&authorization_sk);
     client
         .post_contents(
             authorization_seed,
@@ -506,7 +504,8 @@ mod test {
 
         let mock = server.mock(|when, then| {
             when.method(GET)
-                .path_matches(Regex::new("/file-path/[0-9]+").unwrap());
+                .path_matches(Regex::new("/file-path").unwrap())
+                .header("content-type", "application/json");
             then.status(200)
                 .header("content-type", "application/json")
                 .json_body_obj(&PathTableRecord {
@@ -533,10 +532,103 @@ mod test {
         let user_info = gen_user_info(user_id)?;
         let path_id = 2;
         let parent_filepath = "/root/test";
+        let filename = "test.txt";
+        let test_path_record = gen_test_path_table_record(
+            &user_info,
+            region_name,
+            user_id,
+            path_id,
+            parent_filepath,
+            filename,
+        )?;
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path_matches(Regex::new("/file-path/children").unwrap())
+                .header("content-type", "application/json");
+            then.status(200)
+                .header("content-type", "application/json")
+                .json_body_obj(&[test_path_record]);
+        });
+        let get_filepathes = get_children_pathes(&client, &user_info, parent_filepath).await?;
+        assert_eq!(
+            get_filepathes,
+            vec![parent_filepath.to_string() + "/" + filename]
+        );
+        mock.assert();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn search_descendant_pathes_test() -> Result<()> {
+        let server = MockServer::start_async().await;
+        let region_name = "get_children_pathes_test";
+        let client = HttpClient::new(server.base_url().as_str(), region_name);
+        let user_id = 0;
+        let user_info = gen_user_info(user_id)?;
+
+        let num_pathes = 5;
+        let parent_filepathes = vec!["/dir1", "/dir1", "/dir1", "/dir1/dir2", "/dir1/dir2/dir3"];
+        let filenames = vec!["test1.txt", "test2.txt", "dir2", "dir3", "test2.pdf"];
+        let test_path_records: Vec<PathTableRecord> = (0..num_pathes)
+            .into_iter()
+            .map(|i| {
+                gen_test_path_table_record(
+                    &user_info,
+                    region_name,
+                    i as u64 + 1,
+                    i as u64 + 1,
+                    parent_filepathes[i],
+                    filenames[i],
+                )
+            })
+            .collect::<Result<_, _>>()?;
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path_matches(Regex::new("/file-path/search").unwrap())
+                .header("content-type", "application/json");
+            then.status(200)
+                .header("content-type", "application/json")
+                .json_body_obj(&test_path_records);
+        });
+        let get_filepathes = search_descendant_pathes(&client, &user_info, "/dir1").await?;
+        for i in 0..num_pathes {
+            assert_eq!(
+                get_filepathes[i],
+                parent_filepathes[i].to_string() + "/" + filenames[i]
+            );
+        }
+
+        mock.assert();
+
+        Ok(())
+    }
+
+    fn gen_user_info(user_id: DBInt) -> Result<SelfUserInfo> {
+        let mut rng1 = aead::OsRng;
+        let data_sk = pke_gen_secret_key(&mut rng1)?;
+        let mut rng2 = rand_core::OsRng;
+        let keyword_sk = KeywordSK::gen(&mut rng2, MAX_NUM_KEYWORD);
+        Ok(SelfUserInfo {
+            id: user_id,
+            data_sk,
+            keyword_sk,
+        })
+    }
+
+    fn gen_test_path_table_record(
+        user_info: &SelfUserInfo,
+        region_name: &str,
+        user_id: DBInt,
+        path_id: DBInt,
+        parent_filepath: &str,
+        filename: &str,
+    ) -> Result<PathTableRecord> {
         let data_pk = pke_gen_public_key(&user_info.data_sk);
         let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
         let permission_hash = compute_permission_hash(user_id, parent_filepath);
-        let filepath = parent_filepath.to_string() + "/test.txt";
+        let filepath = parent_filepath.to_string() + "/" + filename;
         let data_ct = encrypt_filepath(&data_pk, &filepath)?;
         let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
             &keyword_pk,
@@ -551,44 +643,6 @@ mod test {
             data_ct: data_ct.to_string(),
             keyword_ct: serde_json::to_string(&keyword_ct)?,
         };
-
-        let mock = server.mock(|when, then| {
-            when.method(GET)
-                .path_matches(Regex::new("/file-path/children/[0-f]+").unwrap());
-            then.status(200)
-                .header("content-type", "application/json")
-                .json_body_obj(&[test_path_record]);
-        });
-        let get_filepathes = get_children_pathes(&client, &user_info, parent_filepath).await?;
-        assert_eq!(get_filepathes, vec![filepath]);
-        mock.assert();
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn search_descendant_pathes_test() -> Result<()> {
-        let server = MockServer::start_async().await;
-        let region_name = "get_children_pathes_test";
-        let client = HttpClient::new(server.base_url().as_str(), region_name);
-        let user_id = 1;
-        let user_info = gen_user_info(user_id)?;
-        let path_id = 2;
-        let parent_filepath = "/root/test";
-        let data_pk = pke_gen_public_key(&user_info.data_sk);
-        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
-        Ok(())
-    }
-
-    fn gen_user_info(user_id: DBInt) -> Result<SelfUserInfo> {
-        let mut rng1 = aead::OsRng;
-        let data_sk = pke_gen_secret_key(&mut rng1)?;
-        let mut rng2 = rand_core::OsRng;
-        let keyword_sk = KeywordSK::gen(&mut rng2, MAX_NUM_KEYWORD);
-        Ok(SelfUserInfo {
-            id: user_id,
-            data_sk,
-            keyword_sk,
-        })
+        Ok(test_path_record)
     }
 }

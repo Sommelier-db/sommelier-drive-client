@@ -324,7 +324,6 @@ impl HttpClient {
         let client = reqwest_wasm::Client::new();
 
         let authorization_sk = pke_derive_secret_key_from_seeed(authorization_seed)?;
-        let authorization_pk = pke_gen_public_key(&authorization_sk);
         let shared_key_hash_str = shared_key_hash.to_string();
         let ct_str = hex::encode(contents_ct);
 
