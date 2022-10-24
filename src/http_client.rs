@@ -281,59 +281,6 @@ impl HttpClient {
         Ok(DBInt::from_str_radix(&text, 10)?)
     }
 
-    /*pub async fn get_write_permission(&self, path_id: DBInt) -> Result<WritePermissionTableRecord> {
-        let url = self.base_url.to_string()
-            + "/write-permission/?path-id="
-            + path_id.to_string().as_str();
-        let record = reqwest_wasm::get(&url)
-            .await?
-            .json::<WritePermissionTableRecord>()
-            .await?;
-        Ok(record)
-    }
-
-    pub async fn post_write_permission(
-        &self,
-        sk: &PkeSecretKey,
-        write_user_id: DBInt,
-        path_id: DBInt,
-        permitted_user_id: DBInt,
-    ) -> Result<DBInt> {
-        let url = self.base_url.to_string() + "/write-permission";
-        let client = reqwest_wasm::Client::new();
-
-        let write_user_id_str = write_user_id.to_string();
-        let path_id_str = path_id.to_string();
-        let permitted_user_id_str = permitted_user_id.to_string();
-
-        let mut map_for_post = HashMap::new();
-        let mut map_for_sign = BTreeMap::new();
-        for (key, val) in [
-            ("writeUserId", write_user_id_str.as_str()),
-            ("pathId", path_id_str.as_str()),
-            ("userId", permitted_user_id_str.as_str()),
-        ] {
-            map_for_post.insert(key, val);
-            map_for_sign.insert(key, val);
-        }
-
-        let req_without_auth = client.post(&url).json(&map_for_post);
-        let res = self
-            .attach_signature(
-                sk,
-                req_without_auth,
-                "POST",
-                &url,
-                write_user_id,
-                map_for_sign,
-            )
-            .await?
-            .send()
-            .await?;
-        let text = res.text().await?;
-        Ok(DBInt::from_str_radix(&text, 10)?)
-    }*/
-
     async fn attach_signature(
         &self,
         sk: &PkeSecretKey,

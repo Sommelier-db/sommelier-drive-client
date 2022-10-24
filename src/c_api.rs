@@ -3,7 +3,6 @@ use anyhow;
 use core::slice;
 use easy_ffi::easy_ffi;
 use errno::{set_errno, Errno};
-//use futures::executor;
 use serde_json;
 use sommelier_drive_cryptos::JsonString;
 use sommelier_drive_cryptos::PkeSecretKey;
@@ -115,8 +114,6 @@ fn_user_info!(
         let fut_result = async { register_user(&client).await };
         let rt = Runtime::new()?;
         let self_user_info = rt.block_on(fut_result)?;
-        //let self_user_info = executor::block_on(fut_result)?;
-
         let user_info = CUserInfo::try_from(self_user_info)?;
         Ok(user_info)
     }
