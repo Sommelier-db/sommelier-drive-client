@@ -523,7 +523,7 @@ mod test {
         let permission_hash = compute_permission_hash(user_id, &parent_filepath);
         let data_pk = pke_gen_public_key(&user_info.data_sk);
         let data_ct = encrypt_filepath(&data_pk, filepath)?;
-        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
+        let keyword_pk = user_info.keyword_sk.into_public_key();
         let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
             &keyword_pk,
             region_name,
@@ -563,7 +563,7 @@ mod test {
         let parent_filepath = "/root/test";
         let filename = "test.txt";
         let data_pk = pke_gen_public_key(&user_info.data_sk);
-        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
+        let keyword_pk = user_info.keyword_sk.into_public_key();
         let test_path_record = gen_test_path_table_record(
             region_name,
             &data_pk,
@@ -600,7 +600,7 @@ mod test {
         let user_id = 0;
         let user_info = gen_user_info(user_id)?;
         let data_pk = pke_gen_public_key(&user_info.data_sk);
-        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
+        let keyword_pk = user_info.keyword_sk.into_public_key();
 
         let num_pathes = 5;
         let parent_filepathes = vec!["/dir1", "/dir1", "/dir1", "/dir1/dir2", "/dir1/dir2/dir3"];

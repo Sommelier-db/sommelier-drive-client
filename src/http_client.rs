@@ -12,7 +12,8 @@ use reqwest_wasm::{
     header::{HeaderValue, AUTHORIZATION},
     RequestBuilder,
 };
-use serde_json;
+use serde_json::json;
+use serde_json::{self, Value};
 use sommelier_drive_cryptos::{
     gen_signature, pke_derive_secret_key_from_seeed, pke_gen_public_key, AuthorizationSeed,
     AuthorizationSeedCT, FilePathCT, HashDigest, HexString, PemString, PkePublicKey, PkeSecretKey,
@@ -36,8 +37,8 @@ impl HttpClient {
     pub async fn get_user(&self, user_id: DBInt) -> Result<UserTableRecord> {
         let url = self.base_url.to_string() + "/user";
         let client = reqwest_wasm::Client::new();
-        let mut map = HashMap::<&str, String>::new();
-        map.insert("userId", user_id.to_string());
+        let mut map = HashMap::<&str, Value>::new();
+        map.insert("userId", json!(user_id));
         let record = client
             .get(url)
             .json(&map)
@@ -51,9 +52,9 @@ impl HttpClient {
     pub async fn post_user(&self, data_pk: &PkePublicKey, keyword_pk: &KeywordPK) -> Result<DBInt> {
         let url = self.base_url.to_string() + "/user";
         let client = reqwest_wasm::Client::new();
-        let mut map = HashMap::<&str, String>::new();
-        map.insert("dataPK", data_pk.to_string()?);
-        map.insert("keywordPK", serde_json::to_string(&keyword_pk)?);
+        let mut map = HashMap::<&str, Value>::new();
+        map.insert("dataPK", json!(data_pk.to_string()?));
+        map.insert("keywordPK", json!(serde_json::to_string(&keyword_pk)?));
         let res = client.post(url).json(&map).send().await?;
         let text = res.text().await?;
         Ok(DBInt::from_str_radix(&text, 10)?)
@@ -62,8 +63,8 @@ impl HttpClient {
     pub async fn get_filepath(&self, path_id: DBInt) -> Result<PathTableRecord> {
         let url = self.base_url.to_string() + "/file-path";
         let client = reqwest_wasm::Client::new();
-        let mut map = HashMap::<&str, String>::new();
-        map.insert("pathId", path_id.to_string());
+        let mut map = HashMap::<&str, Value>::new();
+        map.insert("pathId", json!(path_id));
         let record = client
             .get(&url)
             .json(&map)
@@ -80,8 +81,8 @@ impl HttpClient {
     ) -> Result<Vec<PathTableRecord>> {
         let url = self.base_url.to_string() + "/file-path/children";
         let client = reqwest_wasm::Client::new();
-        let mut map = HashMap::<&str, String>::new();
-        map.insert("permissionHash", permission_hash.to_string());
+        let mut map = HashMap::<&str, Value>::new();
+        map.insert("permissionHash", json!(permission_hash.to_string()));
         let records = client
             .get(&url)
             .json(&map)
@@ -100,8 +101,8 @@ impl HttpClient {
         let url = self.base_url.to_string() + "/file-path/search";
         let client = reqwest_wasm::Client::new();
         let mut map = HashMap::new();
-        map.insert("userId", user_id.to_string());
-        map.insert("trapdoor", serde_json::to_string(td)?);
+        map.insert("userId", json!(user_id));
+        map.insert("trapdoor", json!(serde_json::to_string(td)?));
         let records = client
             .get(url)
             .json(&map)
@@ -131,16 +132,25 @@ impl HttpClient {
         let keyword_ct_str = serde_json::to_string(&keyword_ct)?;
 
         let mut map_for_post = HashMap::new();
+
         let mut map_for_sign = BTreeMap::new();
-        for (key, val) in [
-            ("writeUserId", write_user_id_str.as_str()),
-            ("readUserId", read_user_id_str.as_str()),
-            ("premissionHash", permission_hash_str.as_str()),
-            ("dataCT", data_ct_str.as_str()),
-            ("keywordCT", keyword_ct_str.as_str()),
+        for (key, val_json, val_str) in [
+            (
+                "writeUserId",
+                json!(write_user_id),
+                write_user_id_str.as_str(),
+            ),
+            ("readUserId", json!(read_user_id), read_user_id_str.as_str()),
+            (
+                "premissionHash",
+                json!(permission_hash_str),
+                permission_hash_str.as_str(),
+            ),
+            ("dataCT", json!(data_ct_str), data_ct_str.as_str()),
+            ("keywordCT", json!(keyword_ct_str), keyword_ct_str.as_str()),
         ] {
-            map_for_post.insert(key, val);
-            map_for_sign.insert(key, val);
+            map_for_post.insert(key, val_json);
+            map_for_sign.insert(key, val_str);
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);

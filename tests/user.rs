@@ -9,14 +9,11 @@ use utils::BASE_URL;
 async fn user_flow_test() -> Result<()> {
     let region_name = "register_user_test";
     let client = HttpClient::new(BASE_URL, region_name);
-    let user_id = 1;
     let user_info = register_user(&client).await?;
-    println!("user_info {:?}", user_info);
-    assert_eq!(user_info.id, user_id);
 
-    let (data_pk, keyword_pk) = get_user_public_keys(&client, user_id).await?;
+    let (data_pk, keyword_pk) = get_user_public_keys(&client, user_info.id).await?;
     let data_pk_expected = pke_gen_public_key(&user_info.data_sk);
-    let keyword_pk_expected = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
+    let keyword_pk_expected = user_info.keyword_sk.into_public_key();
     assert_eq!(data_pk.to_string()?, data_pk_expected.to_string()?);
     assert_eq!(
         serde_json::to_string(&keyword_pk).unwrap(),

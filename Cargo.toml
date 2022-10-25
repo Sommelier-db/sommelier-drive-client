@@ -6,7 +6,7 @@ authors = ["Sora Suegami"]
 
 [dependencies]
 sommelier-drive-cryptos = {git = "https://github.com/Sommelier-db/sommelier-drive-cryptos.git", version = "0.1.0", default-features=false}
-rust-searchable-pke = {git = "https://github.com/SoraSuegami/rust-searchable-pke.git", branch = "develop", version = "0.1.0", default-features=false}
+rust-searchable-pke = {git = "https://github.com/SoraSuegami/rust-searchable-pke.git", version = "0.1.0", default-features=false}
 paired = "0.22.0"
 groupy = "0.4.1"
 serde_json = "1.0"

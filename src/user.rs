@@ -19,7 +19,7 @@ pub async fn register_user(client: &HttpClient) -> Result<SelfUserInfo> {
     let data_pk = pke_gen_public_key(&data_sk);
     let mut rng2 = rand_core::OsRng;
     let keyword_sk = KeywordSK::gen(&mut rng2, MAX_NUM_KEYWORD);
-    let keyword_pk = keyword_sk.into_public_key(&mut rng2);
+    let keyword_pk = keyword_sk.into_public_key();
     let id = client.post_user(&data_pk, &keyword_pk).await?;
     Ok(SelfUserInfo {
         data_sk,
@@ -75,7 +75,7 @@ mod test {
         let data_pk = pke_gen_public_key(&data_sk);
         let mut rng2 = rand_core::OsRng;
         let keyword_sk = KeywordSK::gen(&mut rng2, MAX_NUM_KEYWORD);
-        let keyword_pk = keyword_sk.into_public_key(&mut rng2);
+        let keyword_pk = keyword_sk.into_public_key();
         let user_id = 1;
         let nonce = 1;
 

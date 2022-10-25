@@ -13,38 +13,55 @@ pub const MAX_NUM_KEYWORD: usize = 64;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserTableRecord {
+    #[serde(rename = "userId")]
     pub user_id: DBInt,
+    #[serde(rename = "dataPK")]
     pub data_pk: String,
+    #[serde(rename = "keywordPK")]
     pub keyword_pk: String,
+    #[serde(rename = "nonce")]
     pub nonce: DBInt,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PathTableRecord {
+    #[serde(rename = "pathId")]
     pub path_id: DBInt,
+    #[serde(rename = "userId")]
     pub user_id: DBInt,
+    #[serde(rename = "permissionHash")]
     pub permission_hash: String,
+    #[serde(rename = "dataCT")]
     pub data_ct: String,
+    #[serde(rename = "keywordCT")]
     pub keyword_ct: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SharedKeyTableRecord {
+    #[serde(rename = "sharedKeyId")]
     pub shared_key_id: DBInt,
+    #[serde(rename = "pathId")]
     pub path_id: DBInt,
+    #[serde(rename = "sharedKeyCT")]
     pub shared_key_ct: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthorizationSeedTableRecord {
+    #[serde(rename = "authorizationSeedId")]
     pub authorization_seed_id: DBInt,
+    #[serde(rename = "pathId")]
     pub path_id: DBInt,
+    #[serde(rename = "authorizationSeedCT")]
     pub authorization_seed_ct: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ContentsTableReocrd {
+    #[serde(rename = "contentsId")]
     pub contents_id: DBInt,
+    #[serde(rename = "sharedKeyHash")]
     pub shared_key_hash: String,
     pub authorization_pk: String,
     pub nonce: DBInt,
