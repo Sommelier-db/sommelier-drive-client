@@ -31,7 +31,7 @@ tokio = {version = "1.21.2", features = ["macros"]}
 httpmock = "0.6.6"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "rlib", "staticlib"]
 
 [features]
 default = ["c_api"]
