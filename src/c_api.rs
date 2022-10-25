@@ -188,7 +188,7 @@ fn_char_pointer!(
     }
 );
 
-easy_ffi!(fn_int_pointer =>
+easy_ffi!(fn_int =>
     |err| {
         set_errno(Errno(EINVAL));
         return -1;
@@ -202,7 +202,7 @@ easy_ffi!(fn_int_pointer =>
     }
 );
 
-fn_int_pointer!(
+fn_int!(
     fn getChildrenPathes(
         client: CHttpClient,
         user_info: CUserInfo,
@@ -224,7 +224,7 @@ fn_int_pointer!(
     }
 );
 
-fn_int_pointer!(
+fn_int!(
     fn searchDescendantPathes(
         client: CHttpClient,
         user_info: CUserInfo,
@@ -246,7 +246,7 @@ fn_int_pointer!(
     }
 );
 
-fn_int_pointer!(
+fn_int!(
     fn isExistFilepath(
         client: CHttpClient,
         user_info: CUserInfo,
@@ -359,7 +359,21 @@ fn_contents_data!(
     }
 );
 
-fn_void!(
+easy_ffi!(fn_result_int =>
+    |err| {
+        set_errno(Errno(EINVAL));
+        return 0;
+    }
+    |panic_val| {
+        set_errno(Errno(EINVAL));
+        match panic_val.downcast_ref::<&'static str>() {
+            Some(s) => panic!("sommelier-drive-client-panic: {}",s),
+            None => panic!("sommelier-drive-client-panic without an error message"),
+        }
+    }
+);
+
+fn_result_int!(
     fn addFile(
         client: CHttpClient,
         user_info: CUserInfo,
@@ -367,7 +381,7 @@ fn_void!(
         filename: *mut c_char,
         file_bytes_ptr: *const u8,
         file_bytes_len: usize,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<c_int, anyhow::Error> {
         let client = client.into();
         let user_info = user_info.try_into()?;
         let cur_dir = ptr2str(cur_dir);
@@ -377,17 +391,17 @@ fn_void!(
             async { add_file(&client, &user_info, cur_dir, filename, file_bytes).await };
         let rt = Runtime::new()?;
         rt.block_on(fut_result)?;
-        Ok(())
+        Ok(1)
     }
 );
 
-fn_void!(
+fn_result_int!(
     fn addDirectory(
         client: CHttpClient,
         user_info: CUserInfo,
         cur_dir: *mut c_char,
         filename: *mut c_char,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<c_int, anyhow::Error> {
         let client = client.into();
         let user_info = user_info.try_into()?;
         let cur_dir = ptr2str(cur_dir);
@@ -395,17 +409,17 @@ fn_void!(
         let fut_result = async { add_directory(&client, &user_info, cur_dir, filename).await };
         let rt = Runtime::new()?;
         rt.block_on(fut_result)?;
-        Ok(())
+        Ok(1)
     }
 );
 
-fn_void!(
+fn_result_int!(
     fn addReadPermission(
         client: CHttpClient,
         user_info: CUserInfo,
         filepath: *mut c_char,
         new_user_id: u64,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<c_int, anyhow::Error> {
         let client = client.into();
         let user_info = user_info.try_into()?;
         let filepath = ptr2str(filepath);
@@ -413,18 +427,18 @@ fn_void!(
             async { add_read_permission(&client, &user_info, filepath, new_user_id).await };
         let rt = Runtime::new()?;
         rt.block_on(fut_result)?;
-        Ok(())
+        Ok(1)
     }
 );
 
-fn_void!(
+fn_result_int!(
     fn modifyFile(
         client: CHttpClient,
         user_info: CUserInfo,
         filepath: *mut c_char,
         new_file_bytes_ptr: *const u8,
         new_file_bytes_len: usize,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<c_int, anyhow::Error> {
         let client = client.into();
         let user_info = user_info.try_into()?;
         let filepath = ptr2str(filepath);
@@ -433,7 +447,7 @@ fn_void!(
         let fut_result = async { modify_file(&client, &user_info, filepath, file_bytes).await };
         let rt = Runtime::new()?;
         rt.block_on(fut_result)?;
-        Ok(())
+        Ok(1)
     }
 );
 

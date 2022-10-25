@@ -33,22 +33,22 @@ typedef struct CContentsData {
   size_t file_bytes_len;
 } CContentsData;
 
-void addDirectory(struct CHttpClient client,
-                  struct CUserInfo user_info,
-                  char *cur_dir,
-                  char *filename);
+int addDirectory(struct CHttpClient client,
+                 struct CUserInfo user_info,
+                 char *cur_dir,
+                 char *filename);
 
-void addFile(struct CHttpClient client,
-             struct CUserInfo user_info,
-             char *cur_dir,
-             char *filename,
-             const uint8_t *file_bytes_ptr,
-             size_t file_bytes_len);
+int addFile(struct CHttpClient client,
+            struct CUserInfo user_info,
+            char *cur_dir,
+            char *filename,
+            const uint8_t *file_bytes_ptr,
+            size_t file_bytes_len);
 
-void addReadPermission(struct CHttpClient client,
-                       struct CUserInfo user_info,
-                       char *filepath,
-                       uint64_t new_user_id);
+int addReadPermission(struct CHttpClient client,
+                      struct CUserInfo user_info,
+                      char *filepath,
+                      uint64_t new_user_id);
 
 int getChildrenPathes(struct CHttpClient client,
                       struct CUserInfo user_info,
@@ -61,11 +61,11 @@ struct CPublicKeys getPublicKeys(struct CHttpClient client, uint64_t user_id);
 
 int isExistFilepath(struct CHttpClient client, struct CUserInfo user_info, char *filepath);
 
-void modifyFile(struct CHttpClient client,
-                struct CUserInfo user_info,
-                char *filepath,
-                const uint8_t *new_file_bytes_ptr,
-                size_t new_file_bytes_len);
+int modifyFile(struct CHttpClient client,
+               struct CUserInfo user_info,
+               char *filepath,
+               const uint8_t *new_file_bytes_ptr,
+               size_t new_file_bytes_len);
 
 struct CContentsData openFilepath(struct CHttpClient client,
                                   struct CUserInfo user_info,
