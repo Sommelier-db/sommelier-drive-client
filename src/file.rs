@@ -86,36 +86,34 @@ pub async fn open_filepath(
 pub async fn add_file(
     client: &HttpClient,
     user_info: &SelfUserInfo,
-    cur_dir: &str,
-    filename: &str,
+    filepath: &str,
     file_bytes: Vec<u8>,
 ) -> Result<()> {
-    add_contents_generic(client, user_info, cur_dir, filename, true, file_bytes).await
+    add_contents_generic(client, user_info, filepath, true, file_bytes).await
 }
 
 pub async fn add_directory(
     client: &HttpClient,
     user_info: &SelfUserInfo,
-    cur_dir: &str,
-    filename: &str,
+    filepath: &str,
 ) -> Result<()> {
-    add_contents_generic(client, user_info, cur_dir, filename, false, Vec::new()).await
+    add_contents_generic(client, user_info, filepath, false, Vec::new()).await
 }
 
 async fn add_contents_generic(
     client: &HttpClient,
     user_info: &SelfUserInfo,
-    cur_dir: &str,
-    filename: &str,
+    filepath: &str,
     is_file: bool,
     file_bytes: Vec<u8>,
 ) -> Result<()> {
-    let cur_dir_contents = open_filepath(client, user_info, cur_dir).await?;
+    let (filename, cur_dir) = split_filepath(filepath);
+    let cur_dir_contents = open_filepath(client, user_info, cur_dir.as_str()).await?;
     let readable_user_path_ids = cur_dir_contents.readable_user_path_ids;
     let writeable_user_path_ids = cur_dir_contents.writeable_user_path_ids;
     let num_readable_users = readable_user_path_ids.len();
     let num_writeable_users = writeable_user_path_ids.len();
-    let filepath = cur_dir.to_string() + "/" + filename;
+    let filepath = cur_dir.to_string() + "/" + filename.as_str();
     let new_contents_data = ContentsData {
         is_file,
         num_readable_users,
@@ -153,7 +151,7 @@ async fn add_contents_generic(
             &mut rng,
         )?;
         let read_user_id = readbale_user_ids[i];
-        let permission_hash = compute_permission_hash(read_user_id, cur_dir);
+        let permission_hash = compute_permission_hash(read_user_id, cur_dir.as_str());
         let path_id = client
             .post_file_path(
                 data_sk,

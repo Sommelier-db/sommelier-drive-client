@@ -33,15 +33,11 @@ typedef struct CContentsData {
   size_t file_bytes_len;
 } CContentsData;
 
-int addDirectory(struct CHttpClient client,
-                 struct CUserInfo user_info,
-                 char *cur_dir,
-                 char *filename);
+int addDirectory(struct CHttpClient client, struct CUserInfo user_info, char *filepath);
 
 int addFile(struct CHttpClient client,
             struct CUserInfo user_info,
-            char *cur_dir,
-            char *filename,
+            char *filepath,
             const uint8_t *file_bytes_ptr,
             size_t file_bytes_len);
 

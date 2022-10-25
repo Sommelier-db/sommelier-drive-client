@@ -43,19 +43,6 @@ impl Into<HttpClient> for CHttpClient {
     }
 }
 
-easy_ffi!(fn_void =>
-    |err| {
-        set_errno(Errno(EINVAL));
-    }
-    |panic_val| {
-        set_errno(Errno(EINVAL));
-        match panic_val.downcast_ref::<&'static str>() {
-            Some(s) => panic!("sommelier-drive-client-panic: {}",s),
-            None => panic!("sommelier-drive-client-panic without an error message"),
-        }
-    }
-);
-
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct CUserInfo {
@@ -377,18 +364,15 @@ fn_result_int!(
     fn addFile(
         client: CHttpClient,
         user_info: CUserInfo,
-        cur_dir: *mut c_char,
-        filename: *mut c_char,
+        filepath: *mut c_char,
         file_bytes_ptr: *const u8,
         file_bytes_len: usize,
     ) -> Result<c_int, anyhow::Error> {
         let client = client.into();
         let user_info = user_info.try_into()?;
-        let cur_dir = ptr2str(cur_dir);
-        let filename = ptr2str(filename);
+        let filepath = ptr2str(filepath);
         let file_bytes = unsafe { slice::from_raw_parts(file_bytes_ptr, file_bytes_len) }.to_vec();
-        let fut_result =
-            async { add_file(&client, &user_info, cur_dir, filename, file_bytes).await };
+        let fut_result = async { add_file(&client, &user_info, filepath, file_bytes).await };
         let rt = Runtime::new()?;
         rt.block_on(fut_result)?;
         Ok(1)
@@ -399,14 +383,12 @@ fn_result_int!(
     fn addDirectory(
         client: CHttpClient,
         user_info: CUserInfo,
-        cur_dir: *mut c_char,
-        filename: *mut c_char,
+        filepath: *mut c_char,
     ) -> Result<c_int, anyhow::Error> {
         let client = client.into();
         let user_info = user_info.try_into()?;
-        let cur_dir = ptr2str(cur_dir);
-        let filename = ptr2str(filename);
-        let fut_result = async { add_directory(&client, &user_info, cur_dir, filename).await };
+        let filepath = ptr2str(filepath);
+        let fut_result = async { add_directory(&client, &user_info, filepath).await };
         let rt = Runtime::new()?;
         rt.block_on(fut_result)?;
         Ok(1)
