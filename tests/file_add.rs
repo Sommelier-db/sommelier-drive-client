@@ -12,16 +12,17 @@ use utils::BASE_URL;
 async fn add_file_flow_test() -> Result<()> {
     let region_name = "register_user_test";
     let client = HttpClient::new(BASE_URL, region_name);
-    let user_info = register_user(&client).await?;
+    let init_filepath = "/user1";
+    let user_info = register_user(&client, init_filepath).await?;
     println!("user_info {:?}", user_info);
 
     let test_text = b"Hello, Sommelier!";
-    let cur_dir = "/user1";
+    let cur_dir = init_filepath;
     let filename = "test.txt";
     let filepath = cur_dir.to_string() + "/" + filename;
     let is_exist_pre = is_exist_filepath(&client, &user_info, &filepath).await?;
     assert!(!is_exist_pre);
-    add_file(&client, &user_info, cur_dir, filename, test_text.to_vec()).await?;
+    add_file(&client, &user_info, &filepath, test_text.to_vec()).await?;
     let contents_data = open_filepath(&client, &user_info, &filepath).await?;
     assert!(contents_data.is_file);
     assert_eq!(contents_data.num_readable_users, 1);

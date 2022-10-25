@@ -5,6 +5,7 @@ mod file;
 mod http_client;
 mod types;
 mod user;
+mod utils;
 
 #[cfg(feature = "c_api")]
 pub use c_api::*;

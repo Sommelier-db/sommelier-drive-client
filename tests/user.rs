@@ -9,7 +9,8 @@ use utils::BASE_URL;
 async fn user_flow_test() -> Result<()> {
     let region_name = "register_user_test";
     let client = HttpClient::new(BASE_URL, region_name);
-    let user_info = register_user(&client).await?;
+    let init_filepath = "/user1";
+    let user_info = register_user(&client, &init_filepath).await?;
 
     let (data_pk, keyword_pk) = get_user_public_keys(&client, user_info.id).await?;
     let data_pk_expected = pke_gen_public_key(&user_info.data_sk);

@@ -96,9 +96,13 @@ easy_ffi!(fn_user_info =>
 );
 
 fn_user_info!(
-    fn registerUser(client: CHttpClient) -> Result<CUserInfo, anyhow::Error> {
+    fn registerUser(
+        client: CHttpClient,
+        filepath: *mut c_char,
+    ) -> Result<CUserInfo, anyhow::Error> {
         let client: HttpClient = client.into();
-        let fut_result = async { register_user(&client).await };
+        let filepath = ptr2str(filepath);
+        let fut_result = async { register_user(&client, filepath).await };
         let rt = Runtime::new()?;
         let self_user_info = rt.block_on(fut_result)?;
         let user_info = CUserInfo::try_from(self_user_info)?;

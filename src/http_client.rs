@@ -49,12 +49,21 @@ impl HttpClient {
         Ok(record)
     }
 
-    pub async fn post_user(&self, data_pk: &PkePublicKey, keyword_pk: &KeywordPK) -> Result<DBInt> {
+    pub async fn post_user(
+        &self,
+        data_pk: &PkePublicKey,
+        keyword_pk: &KeywordPK,
+        data_ct: &FilePathCT,
+        keyword_ct: &KeywordCT,
+    ) -> Result<DBInt> {
         let url = self.base_url.to_string() + "/user";
         let client = reqwest_wasm::Client::new();
+
         let mut map = HashMap::<&str, Value>::new();
         map.insert("dataPK", json!(data_pk.to_string()?));
         map.insert("keywordPK", json!(serde_json::to_string(&keyword_pk)?));
+        map.insert("dataCT", json!(data_ct.to_string()));
+        map.insert("keywordCT", json!(serde_json::to_string(keyword_ct)?));
         let res = client.post(url).json(&map).send().await?;
         let text = res.text().await?;
         Ok(DBInt::from_str_radix(&text, 10)?)
