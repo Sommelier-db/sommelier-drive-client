@@ -166,8 +166,8 @@ impl HttpClient {
     pub async fn get_shared_key(&self, path_id: DBInt) -> Result<SharedKeyTableRecord> {
         let url = self.base_url.to_string() + "/shared-key";
         let client = reqwest_wasm::Client::new();
-        let mut map = HashMap::<&str, String>::new();
-        map.insert("pathId", path_id.to_string());
+        let mut map = HashMap::<&str, Value>::new();
+        map.insert("pathId", json!(path_id));
         let record = client
             .get(&url)
             .json(&map)
@@ -194,13 +194,17 @@ impl HttpClient {
 
         let mut map_for_post = HashMap::new();
         let mut map_for_sign = BTreeMap::new();
-        for (key, val) in [
-            ("writeUserId", write_user_id_str.as_str()),
-            ("pathId", path_id_str.as_str()),
-            ("ct", ct_str.as_str()),
+        for (key, val_json, val_str) in [
+            (
+                "writeUserId",
+                json!(write_user_id),
+                write_user_id_str.as_str(),
+            ),
+            ("pathId", json!(path_id), path_id_str.as_str()),
+            ("ct", json!(ct_str), ct_str.as_str()),
         ] {
-            map_for_post.insert(key, val);
-            map_for_sign.insert(key, val);
+            map_for_post.insert(key, val_json);
+            map_for_sign.insert(key, val_str);
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);
@@ -219,8 +223,8 @@ impl HttpClient {
     ) -> Result<AuthorizationSeedTableRecord> {
         let url = self.base_url.to_string() + "/authorization-seed";
         let client = reqwest_wasm::Client::new();
-        let mut map = HashMap::<&str, String>::new();
-        map.insert("pathId", path_id.to_string());
+        let mut map = HashMap::<&str, Value>::new();
+        map.insert("pathId", json!(path_id));
         let record = client
             .get(&url)
             .json(&map)
@@ -247,13 +251,17 @@ impl HttpClient {
 
         let mut map_for_post = HashMap::new();
         let mut map_for_sign = BTreeMap::new();
-        for (key, val) in [
-            ("writeUserId", write_user_id_str.as_str()),
-            ("pathId", path_id_str.as_str()),
-            ("ct", ct_str.as_str()),
+        for (key, val_json, val_str) in [
+            (
+                "writeUserId",
+                json!(write_user_id),
+                write_user_id_str.as_str(),
+            ),
+            ("pathId", json!(path_id), path_id_str.as_str()),
+            ("ct", json!(ct_str), ct_str.as_str()),
         ] {
-            map_for_post.insert(key, val);
-            map_for_sign.insert(key, val);
+            map_for_post.insert(key, val_json);
+            map_for_sign.insert(key, val_str);
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);
@@ -269,8 +277,8 @@ impl HttpClient {
     pub async fn get_contents(&self, shared_key_hash: &HashDigest) -> Result<ContentsTableReocrd> {
         let url = self.base_url.to_string() + "/contents";
         let client = reqwest_wasm::Client::new();
-        let mut map = HashMap::<&str, String>::new();
-        map.insert("sharedKeyHash", shared_key_hash.to_string());
+        let mut map = HashMap::<&str, Value>::new();
+        map.insert("sharedKeyHash", json!(shared_key_hash));
         let record = client
             .get(&url)
             .json(&map)
@@ -298,13 +306,17 @@ impl HttpClient {
 
         let mut map_for_post = HashMap::new();
         let mut map_for_sign = BTreeMap::new();
-        for (key, val) in [
-            ("sharedKeyHash", shared_key_hash_str.as_str()),
-            ("authorizationPK", pk_str.as_str()),
-            ("ct", ct_str.as_str()),
+        for (key, val_json, val_str) in [
+            (
+                "sharedKeyHash",
+                json!(shared_key_hash_str),
+                shared_key_hash_str.as_str(),
+            ),
+            ("authorizationPK", json!(pk_str), pk_str.as_str()),
+            ("ct", json!(ct_str), ct_str.as_str()),
         ] {
-            map_for_post.insert(key, val);
-            map_for_sign.insert(key, val);
+            map_for_post.insert(key, val_json);
+            map_for_sign.insert(key, val_str);
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);
@@ -339,12 +351,16 @@ impl HttpClient {
 
         let mut map_for_post = HashMap::new();
         let mut map_for_sign = BTreeMap::new();
-        for (key, val) in [
-            ("sharedKeyHash", shared_key_hash_str.as_str()),
-            ("ct", ct_str.as_str()),
+        for (key, val_json, val_str) in [
+            (
+                "sharedKeyHash",
+                json!(shared_key_hash_str),
+                shared_key_hash_str.as_str(),
+            ),
+            ("ct", json!(ct_str), ct_str.as_str()),
         ] {
-            map_for_post.insert(key, val);
-            map_for_sign.insert(key, val);
+            map_for_post.insert(key, val_json);
+            map_for_sign.insert(key, val_str);
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);
@@ -368,8 +384,8 @@ impl HttpClient {
     pub async fn get_write_permission(&self, path_id: DBInt) -> Result<WritePermissionTableRecord> {
         let url = self.base_url.to_string() + "/write-permission";
         let client = reqwest_wasm::Client::new();
-        let mut map = HashMap::<&str, String>::new();
-        map.insert("pathId", path_id.to_string());
+        let mut map = HashMap::<&str, Value>::new();
+        map.insert("pathId", json!(path_id));
         let record = client
             .get(&url)
             .json(&map)
@@ -396,13 +412,17 @@ impl HttpClient {
 
         let mut map_for_post = HashMap::new();
         let mut map_for_sign = BTreeMap::new();
-        for (key, val) in [
-            ("writeUserId", write_user_id_str.as_str()),
-            ("pathId", path_id_str.as_str()),
-            ("userId", user_id_str.as_str()),
+        for (key, val_json, val_str) in [
+            (
+                "writeUserId",
+                json!(write_user_id),
+                write_user_id_str.as_str(),
+            ),
+            ("pathId", json!(path_id), path_id_str.as_str()),
+            ("userId", json!(user_id), user_id_str.as_str()),
         ] {
-            map_for_post.insert(key, val);
-            map_for_sign.insert(key, val);
+            map_for_post.insert(key, val_json);
+            map_for_sign.insert(key, val_str);
         }
 
         let req_without_auth = client.post(&url).json(&map_for_post);

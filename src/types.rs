@@ -63,15 +63,21 @@ pub struct ContentsTableReocrd {
     pub contents_id: DBInt,
     #[serde(rename = "sharedKeyHash")]
     pub shared_key_hash: String,
+    #[serde(rename = "authorizationPK")]
     pub authorization_pk: String,
+    #[serde(rename = "nonce")]
     pub nonce: DBInt,
+    #[serde(rename = "contentsCT")]
     pub contents_ct: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WritePermissionTableRecord {
+    #[serde(rename = "wPermissionId")]
     pub w_permission_id: DBInt,
+    #[serde(rename = "pathId")]
     pub path_id: DBInt,
+    #[serde(rename = "userId")]
     pub user_id: DBInt,
 }
 
