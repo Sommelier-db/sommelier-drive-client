@@ -8,9 +8,9 @@ use sommelier_drive_cryptos::{
 
 #[derive(Debug, Clone)]
 pub struct SelfUserInfo {
-    pub(crate) data_sk: PkeSecretKey,
-    pub(crate) keyword_sk: KeywordSK,
-    pub(crate) id: DBInt,
+    pub data_sk: PkeSecretKey,
+    pub keyword_sk: KeywordSK,
+    pub id: DBInt,
 }
 
 pub async fn register_user(client: &HttpClient) -> Result<SelfUserInfo> {
@@ -62,6 +62,7 @@ mod test {
                 .body(user_id.to_string());
         });
         let user_info = register_user(&client).await?;
+        println!("user_info {:?}", user_info);
         assert_eq!(user_info.id, user_id);
         mock.assert();
         Ok(())

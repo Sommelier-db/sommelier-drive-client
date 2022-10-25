@@ -13,59 +13,59 @@ pub const MAX_NUM_KEYWORD: usize = 64;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserTableRecord {
-    pub(crate) user_id: DBInt,
-    pub(crate) data_pk: String,
-    pub(crate) keyword_pk: String,
-    pub(crate) nonce: DBInt,
+    pub user_id: DBInt,
+    pub data_pk: String,
+    pub keyword_pk: String,
+    pub nonce: DBInt,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PathTableRecord {
-    pub(crate) path_id: DBInt,
-    pub(crate) user_id: DBInt,
-    pub(crate) permission_hash: String,
-    pub(crate) data_ct: String,
-    pub(crate) keyword_ct: String,
+    pub path_id: DBInt,
+    pub user_id: DBInt,
+    pub permission_hash: String,
+    pub data_ct: String,
+    pub keyword_ct: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SharedKeyTableRecord {
-    pub(crate) shared_key_id: DBInt,
-    pub(crate) path_id: DBInt,
-    pub(crate) shared_key_ct: String,
+    pub shared_key_id: DBInt,
+    pub path_id: DBInt,
+    pub shared_key_ct: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthorizationSeedTableRecord {
-    pub(crate) authorization_seed_id: DBInt,
-    pub(crate) path_id: DBInt,
-    pub(crate) authorization_seed_ct: String,
+    pub authorization_seed_id: DBInt,
+    pub path_id: DBInt,
+    pub authorization_seed_ct: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ContentsTableReocrd {
-    pub(crate) contents_id: DBInt,
-    pub(crate) shared_key_hash: String,
-    pub(crate) authorization_pk: String,
-    pub(crate) nonce: DBInt,
-    pub(crate) contents_ct: String,
+    pub contents_id: DBInt,
+    pub shared_key_hash: String,
+    pub authorization_pk: String,
+    pub nonce: DBInt,
+    pub contents_ct: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WritePermissionTableRecord {
-    pub(crate) w_permission_id: DBInt,
-    pub(crate) path_id: DBInt,
-    pub(crate) user_id: DBInt,
+    pub w_permission_id: DBInt,
+    pub path_id: DBInt,
+    pub user_id: DBInt,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContentsData {
-    pub(crate) is_file: bool,
-    pub(crate) num_readable_users: usize,
-    pub(crate) num_writeable_users: usize,
-    pub(crate) readable_user_path_ids: Vec<DBInt>,
-    pub(crate) writeable_user_path_ids: Vec<DBInt>,
-    pub(crate) file_bytes: Vec<u8>,
+    pub is_file: bool,
+    pub num_readable_users: usize,
+    pub num_writeable_users: usize,
+    pub readable_user_path_ids: Vec<DBInt>,
+    pub writeable_user_path_ids: Vec<DBInt>,
+    pub file_bytes: Vec<u8>,
 }
 
 use bytes::{Buf, BufMut};

@@ -470,6 +470,35 @@ fn split_filepath(filepath: &str) -> (String, String) {
 }
 
 #[cfg(test)]
+pub fn gen_test_path_table_record(
+    region_name: &str,
+    data_pk: &PkePublicKey,
+    keyword_pk: &KeywordPK,
+    user_id: DBInt,
+    path_id: DBInt,
+    parent_filepath: &str,
+    filename: &str,
+) -> Result<PathTableRecord> {
+    let permission_hash = compute_permission_hash(user_id, parent_filepath);
+    let filepath = parent_filepath.to_string() + "/" + filename;
+    let data_ct = encrypt_filepath(&data_pk, &filepath)?;
+    let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
+        &keyword_pk,
+        region_name,
+        &filepath,
+        &mut rand_core::OsRng,
+    )?;
+    let test_path_record = PathTableRecord {
+        path_id,
+        user_id,
+        permission_hash: permission_hash.to_string(),
+        data_ct: data_ct.to_string(),
+        keyword_ct: serde_json::to_string(&keyword_ct)?,
+    };
+    Ok(test_path_record)
+}
+
+#[cfg(test)]
 mod test {
     use super::*;
     use aes_gcm::aead;
@@ -533,9 +562,12 @@ mod test {
         let path_id = 2;
         let parent_filepath = "/root/test";
         let filename = "test.txt";
+        let data_pk = pke_gen_public_key(&user_info.data_sk);
+        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
         let test_path_record = gen_test_path_table_record(
-            &user_info,
             region_name,
+            &data_pk,
+            &keyword_pk,
             user_id,
             path_id,
             parent_filepath,
@@ -567,6 +599,8 @@ mod test {
         let client = HttpClient::new(server.base_url().as_str(), region_name);
         let user_id = 0;
         let user_info = gen_user_info(user_id)?;
+        let data_pk = pke_gen_public_key(&user_info.data_sk);
+        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
 
         let num_pathes = 5;
         let parent_filepathes = vec!["/dir1", "/dir1", "/dir1", "/dir1/dir2", "/dir1/dir2/dir3"];
@@ -575,8 +609,9 @@ mod test {
             .into_iter()
             .map(|i| {
                 gen_test_path_table_record(
-                    &user_info,
                     region_name,
+                    &data_pk,
+                    &keyword_pk,
                     i as u64 + 1,
                     i as u64 + 1,
                     parent_filepathes[i],
@@ -615,34 +650,5 @@ mod test {
             data_sk,
             keyword_sk,
         })
-    }
-
-    fn gen_test_path_table_record(
-        user_info: &SelfUserInfo,
-        region_name: &str,
-        user_id: DBInt,
-        path_id: DBInt,
-        parent_filepath: &str,
-        filename: &str,
-    ) -> Result<PathTableRecord> {
-        let data_pk = pke_gen_public_key(&user_info.data_sk);
-        let keyword_pk = user_info.keyword_sk.into_public_key(&mut rand_core::OsRng);
-        let permission_hash = compute_permission_hash(user_id, parent_filepath);
-        let filepath = parent_filepath.to_string() + "/" + filename;
-        let data_ct = encrypt_filepath(&data_pk, &filepath)?;
-        let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
-            &keyword_pk,
-            region_name,
-            &filepath,
-            &mut rand_core::OsRng,
-        )?;
-        let test_path_record = PathTableRecord {
-            path_id,
-            user_id,
-            permission_hash: permission_hash.to_string(),
-            data_ct: data_ct.to_string(),
-            keyword_ct: serde_json::to_string(&keyword_ct)?,
-        };
-        Ok(test_path_record)
     }
 }
