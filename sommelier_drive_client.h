@@ -67,7 +67,7 @@ struct CContentsData openFilepath(struct CHttpClient client,
                                   struct CUserInfo user_info,
                                   char *filepath);
 
-struct CUserInfo registerUser(struct CHttpClient client);
+struct CUserInfo registerUser(struct CHttpClient client, char *filepath);
 
 int searchDescendantPathes(struct CHttpClient client,
                            struct CUserInfo user_info,

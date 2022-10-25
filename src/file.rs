@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::types::*;
 use crate::user::SelfUserInfo;
@@ -108,42 +108,34 @@ async fn add_contents_generic(
     is_file: bool,
     file_bytes: Vec<u8>,
 ) -> Result<()> {
-    let (filename, cur_dir) = split_filepath(filepath);
+    let (filename, cur_dir) = split_filepath(filepath)?;
     let cur_dir_contents = open_filepath(client, user_info, cur_dir.as_str()).await?;
     let readable_user_path_ids = cur_dir_contents.readable_user_path_ids;
     let writeable_user_path_ids = cur_dir_contents.writeable_user_path_ids;
     let num_readable_users = readable_user_path_ids.len();
     let num_writeable_users = writeable_user_path_ids.len();
     let filepath = cur_dir.to_string() + "/" + filename.as_str();
-    let new_contents_data = ContentsData {
-        is_file,
-        num_readable_users,
-        num_writeable_users,
-        readable_user_path_ids,
-        writeable_user_path_ids,
-        file_bytes,
-    };
     let mut readbale_user_ids = Vec::with_capacity(num_readable_users);
     let mut data_pks = Vec::with_capacity(num_readable_users);
     let mut keyword_pks = Vec::with_capacity(num_readable_users);
 
     for i in 0..num_readable_users {
-        let path_record = client
-            .get_filepath(new_contents_data.readable_user_path_ids[i])
-            .await?;
+        let path_record = client.get_filepath(readable_user_path_ids[i]).await?;
         readbale_user_ids.push(path_record.user_id);
         let (data_pk, keyword_pk) = get_user_public_keys(client, path_record.user_id).await?;
         data_pks.push(data_pk);
         keyword_pks.push(keyword_pk);
     }
-    let contents_bytes = new_contents_data.to_bytes();
-    let file_ct = encrypt_new_file(&data_pks, &filepath, &contents_bytes)?;
+    /*let contents_bytes = new_contents_data.to_bytes();
+    let file_ct = encrypt_new_file(&data_pks, &filepath, &contents_bytes)?;*/
+    let (filepath_cts, shared_key_cts, recovered_shared_key) =
+        encrypt_new_path_for_multi_pks(&data_pks, &filepath)?;
     let mut rng = rand_core::OsRng;
     let data_sk = &user_info.data_sk;
     let write_user_id = user_info.id;
 
     // 1. Path table
-    let mut new_path_id_of_user_id = HashMap::new();
+    let mut new_path_id_of_user_id = BTreeMap::new();
     for i in 0..num_readable_users {
         let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
             &keyword_pks[i],
@@ -159,7 +151,7 @@ async fn add_contents_generic(
                 write_user_id,
                 read_user_id,
                 &permission_hash,
-                &file_ct.filepath_cts[i],
+                &filepath_cts[i],
                 &keyword_ct,
             )
             .await?;
@@ -169,7 +161,7 @@ async fn add_contents_generic(
     // 2. Shared key table
     for i in 0..num_readable_users {
         let read_user_id = readbale_user_ids[i];
-        let shared_key_ct = &file_ct.shared_key_cts[i];
+        let shared_key_ct = &shared_key_cts[i];
         client
             .post_shared_key(
                 data_sk,
@@ -184,9 +176,7 @@ async fn add_contents_generic(
     let authorization_seed = gen_authorization_seed();
     let mut writeable_user_ids = Vec::with_capacity(num_writeable_users);
     for i in 0..num_writeable_users {
-        let path_record = client
-            .get_filepath(new_contents_data.writeable_user_path_ids[i])
-            .await?;
+        let path_record = client.get_filepath(writeable_user_path_ids[i]).await?;
         writeable_user_ids.push(path_record.user_id);
         let (pk, _) = get_user_public_keys(client, path_record.user_id).await?;
         let authorization_seed_ct = encrypt_authorization_seed(&pk, authorization_seed)?;
@@ -201,11 +191,29 @@ async fn add_contents_generic(
     }
 
     // 4. Contents table
+    let new_readable_user_path_ids = new_path_id_of_user_id
+        .values()
+        .map(|v| *v)
+        .collect::<Vec<DBInt>>();
+    let new_writable_user_path_ids = writeable_user_ids
+        .iter()
+        .map(|user_id| new_path_id_of_user_id[user_id])
+        .collect::<Vec<DBInt>>();
+    let new_contents_data = ContentsData {
+        is_file,
+        num_readable_users,
+        num_writeable_users,
+        readable_user_path_ids: new_readable_user_path_ids,
+        writeable_user_path_ids: new_writable_user_path_ids,
+        file_bytes,
+    };
+    let contents_ct =
+        encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents_data.to_bytes())?;
     client
         .post_contents(
             authorization_seed,
-            &file_ct.shared_key_hash,
-            &file_ct.contents_ct,
+            &recovered_shared_key.shared_key_hash,
+            &contents_ct,
         )
         .await?;
 
@@ -231,7 +239,7 @@ pub async fn add_read_permission(
     let permission_ct = gen_read_permission_ct(&new_data_pk, &recovered_shared_key, filepath)?;
 
     // 1. Path table
-    let (_, parent_path) = split_filepath(filepath);
+    let (_, parent_path) = split_filepath(filepath)?;
     let permission_hash = compute_permission_hash(new_user_id, &parent_path);
     let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
         &new_keyword_pk,
@@ -429,7 +437,7 @@ mod test {
 
         let path_id = 2;
         let filepath = "/root/test/test.txt";
-        let (_, parent_filepath) = split_filepath(filepath);
+        let (_, parent_filepath) = split_filepath(filepath)?;
         let permission_hash = compute_permission_hash(user_id, &parent_filepath);
         let data_pk = pke_gen_public_key(&user_info.data_sk);
         let data_ct = encrypt_filepath(&data_pk, filepath)?;

@@ -10,11 +10,10 @@ use utils::BASE_URL;
 
 #[tokio::test]
 async fn add_file_flow_test() -> Result<()> {
-    let region_name = "register_user_test";
+    let region_name = "add_file_flow_test";
     let client = HttpClient::new(BASE_URL, region_name);
-    let init_filepath = "/user1";
+    let init_filepath = "/user2";
     let user_info = register_user(&client, init_filepath).await?;
-    println!("user_info {:?}", user_info);
 
     let test_text = b"Hello, Sommelier!";
     let cur_dir = init_filepath;
@@ -38,6 +37,6 @@ async fn add_file_flow_test() -> Result<()> {
     assert_eq!(got_path, filepath);
 
     let is_exist_after = is_exist_filepath(&client, &user_info, &filepath).await?;
-    assert!(!is_exist_after);
+    assert!(is_exist_after);
     Ok(())
 }

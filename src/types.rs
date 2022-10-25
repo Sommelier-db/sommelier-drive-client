@@ -43,7 +43,7 @@ pub struct SharedKeyTableRecord {
     pub shared_key_id: DBInt,
     #[serde(rename = "pathId")]
     pub path_id: DBInt,
-    #[serde(rename = "sharedKeyCT")]
+    #[serde(rename = "ct")]
     pub shared_key_ct: String,
 }
 
@@ -53,7 +53,7 @@ pub struct AuthorizationSeedTableRecord {
     pub authorization_seed_id: DBInt,
     #[serde(rename = "pathId")]
     pub path_id: DBInt,
-    #[serde(rename = "authorizationSeedCT")]
+    #[serde(rename = "ct")]
     pub authorization_seed_ct: String,
 }
 
@@ -67,7 +67,7 @@ pub struct ContentsTableReocrd {
     pub authorization_pk: String,
     #[serde(rename = "nonce")]
     pub nonce: DBInt,
-    #[serde(rename = "contentsCT")]
+    #[serde(rename = "ct")]
     pub contents_ct: String,
 }
 
@@ -111,7 +111,6 @@ impl ContentsData {
         }
         let mut file_bytes = Vec::new();
         file_bytes.put(&mut p.take(Self::MAX_BYTE_SIZE));
-        assert!(p.has_remaining());
         Self {
             is_file,
             num_readable_users,

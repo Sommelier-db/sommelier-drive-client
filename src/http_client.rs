@@ -151,7 +151,7 @@ impl HttpClient {
             ),
             ("readUserId", json!(read_user_id), read_user_id_str.as_str()),
             (
-                "premissionHash",
+                "permissionHash",
                 json!(permission_hash_str),
                 permission_hash_str.as_str(),
             ),
@@ -287,7 +287,7 @@ impl HttpClient {
         let url = self.base_url.to_string() + "/contents";
         let client = reqwest_wasm::Client::new();
         let mut map = HashMap::<&str, Value>::new();
-        map.insert("sharedKeyHash", json!(shared_key_hash));
+        map.insert("sharedKeyHash", json!(shared_key_hash.to_string()));
         let record = client
             .get(&url)
             .json(&map)

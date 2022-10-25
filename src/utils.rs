@@ -5,13 +5,14 @@ use crate::types::*;
 use crate::user::SelfUserInfo;
 use anyhow::Result;
 use sommelier_drive_cryptos::*;
+use std::path::{Path, PathBuf};
 
 pub(crate) async fn get_path_id_of_filepath(
     client: &HttpClient,
     user_info: &SelfUserInfo,
     filepath: &str,
 ) -> Result<Option<DBInt>> {
-    let (_, parent_filepath) = split_filepath(filepath);
+    let (_, parent_filepath) = split_filepath(filepath)?;
     let permission_hash = compute_permission_hash(user_info.id, &parent_filepath);
     let records = client.get_children_file_pathes(&permission_hash).await?;
     let path_id = records
@@ -91,9 +92,23 @@ pub(crate) fn decrypt_contents_ct_str(
     Ok(contents_data)
 }
 
-pub(crate) fn split_filepath(filepath: &str) -> (String, String) {
-    let path_split: Vec<&str> = filepath.split('/').collect();
-    let filename = path_split[path_split.len() - 1];
-    let dir_name = path_split[0..(path_split.len() - 2)].concat();
-    (filename.to_string(), dir_name)
+pub(crate) fn split_filepath(filepath: &str) -> Result<(String, String)> {
+    let path = Path::new(filepath);
+    let file = path.file_name().ok_or(anyhow::anyhow!(format!(
+        "The file name does not exist in {}",
+        filepath
+    )))?;
+    let parent = path.parent().ok_or(anyhow::anyhow!(format!(
+        "The parent name does not exist in {}",
+        filepath
+    )))?;
+    let file = file.to_str().ok_or(anyhow::anyhow!(format!(
+        "Fail to parse the file name {:?} to str.",
+        file
+    )))?;
+    let parent = parent.to_str().ok_or(anyhow::anyhow!(format!(
+        "Fail to parse the parent name {:?} to str.",
+        file
+    )))?;
+    Ok((file.to_string(), parent.to_string()))
 }

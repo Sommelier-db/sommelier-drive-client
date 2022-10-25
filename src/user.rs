@@ -24,17 +24,16 @@ pub async fn register_user(client: &HttpClient, filepath: &str) -> Result<SelfUs
     let mut rng2 = rand_core::OsRng;
     let keyword_sk = KeywordSK::gen(&mut rng2, MAX_NUM_KEYWORD);
     let keyword_pk = keyword_sk.into_public_key();
-    let file_ct = encrypt_new_file(&[data_pk.clone()], filepath, &vec![])?;
-    let data_ct = file_ct.filepath_cts[0].clone();
+    let (filepath_cts, shared_key_cts, recovered_shared_key) =
+        encrypt_new_path_for_multi_pks(&[data_pk.clone()], &filepath)?;
+    let data_ct = filepath_cts[0].clone();
     let keyword_ct = gen_ciphertext_for_prefix_search::<_, Fr, _>(
         &keyword_pk,
         &client.region_name,
         filepath,
         &mut rand_core::OsRng,
     )?;
-    let shared_key_ct = file_ct.shared_key_cts[0].clone();
-    let shared_key_hash = file_ct.shared_key_hash;
-    let shared_key = recover_shared_key(&data_sk, &shared_key_ct)?.shared_key;
+    let shared_key_ct = shared_key_cts[0].clone();
 
     // 1. User table & Path table & Write permission table
     let user_id = client
@@ -48,12 +47,10 @@ pub async fn register_user(client: &HttpClient, filepath: &str) -> Result<SelfUs
     let path_id = get_path_id_of_filepath(&client, &user_info, filepath)
         .await?
         .expect("The initial path id does not exist.");
-
     // 2. Shared key table
     client
         .post_shared_key(&user_info.data_sk, path_id, user_info.id, &shared_key_ct)
         .await?;
-
     // 3. Authorization code table
     let authorization_seed = gen_authorization_seed();
     let authorization_seed_ct = encrypt_authorization_seed(&data_pk, authorization_seed)?;
@@ -65,7 +62,6 @@ pub async fn register_user(client: &HttpClient, filepath: &str) -> Result<SelfUs
             &authorization_seed_ct,
         )
         .await?;
-
     // 4. Contents table
     let new_contents_data = ContentsData {
         is_file: false,
@@ -73,15 +69,17 @@ pub async fn register_user(client: &HttpClient, filepath: &str) -> Result<SelfUs
         num_writeable_users: 1,
         readable_user_path_ids: vec![path_id],
         writeable_user_path_ids: vec![path_id],
-        file_bytes: vec![],
+        file_bytes: Vec::new(),
     };
-    let mut nonce = [0; NONCE_BYTES_SIZE];
-    rng1.fill_bytes(&mut nonce);
-    let contents_ct = ske_encrypt(&shared_key, &nonce, &new_contents_data.to_bytes())?;
+    let contents_ct =
+        encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents_data.to_bytes())?;
     client
-        .post_contents(authorization_seed, &shared_key_hash, &contents_ct)
+        .post_contents(
+            authorization_seed,
+            &recovered_shared_key.shared_key_hash,
+            &contents_ct,
+        )
         .await?;
-
     // 5. Write permission table
     client
         .post_write_permission(&user_info.data_sk, user_info.id, path_id, user_info.id)
