@@ -49,7 +49,7 @@ pub struct SharedKeyTableRecord {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthorizationSeedTableRecord {
-    #[serde(rename = "authorizationSeedId")]
+    #[serde(rename = "authorizationId")]
     pub authorization_seed_id: DBInt,
     #[serde(rename = "pathId")]
     pub path_id: DBInt,

@@ -92,7 +92,7 @@ async fn ls_flow_test() -> Result<()> {
     assert_eq!(filepathes, children);
     Ok(())
 }
-/*
+
 #[tokio::test]
 async fn find_flow_test() -> Result<()> {
     let region_name = "find_flow_test";
@@ -126,4 +126,35 @@ async fn find_flow_test() -> Result<()> {
         assert!(descendants.contains(&exp.to_string()));
     }
     Ok(())
-}*/
+}
+
+#[tokio::test]
+async fn modify_file_flow_test() -> Result<()> {
+    let region_name = "modify_file_flow_test";
+    let client = HttpClient::new(BASE_URL, region_name);
+    let init_filepath = "/user1";
+    let user_info = register_user(&client, init_filepath).await?;
+
+    let test_text = b"Hello, Sommelier!";
+    let cur_dir = init_filepath;
+    let filename = "test.txt";
+    let filepath = cur_dir.to_string() + "/" + filename;
+    add_file(&client, &user_info, &filepath, test_text.to_vec()).await?;
+
+    let new_text = b"Hello, Sommelier?";
+    modify_file(&client, &user_info, &filepath, new_text.to_vec()).await?;
+    let contents_data = open_filepath(&client, &user_info, &filepath).await?;
+    assert!(contents_data.is_file);
+    assert_eq!(contents_data.num_readable_users, 1);
+    assert_eq!(contents_data.num_writeable_users, 1);
+    assert_eq!(
+        contents_data.readable_user_path_ids[0],
+        contents_data.writeable_user_path_ids[0]
+    );
+    assert_eq!(contents_data.file_bytes, new_text);
+    assert_ne!(contents_data.file_bytes, test_text);
+    let got_path =
+        get_filepath_with_id(&client, &user_info, contents_data.readable_user_path_ids[0]).await?;
+    assert_eq!(got_path, filepath);
+    Ok(())
+}

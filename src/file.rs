@@ -175,15 +175,18 @@ async fn add_contents_generic(
     // 3. Authorization seed table
     let authorization_seed = gen_authorization_seed();
     let mut writeable_user_ids = Vec::with_capacity(num_writeable_users);
+    let mut new_writable_user_path_ids = Vec::with_capacity(num_writeable_users);
     for i in 0..num_writeable_users {
         let path_record = client.get_filepath(writeable_user_path_ids[i]).await?;
         writeable_user_ids.push(path_record.user_id);
+        let new_path_id = new_path_id_of_user_id[&path_record.user_id];
+        new_writable_user_path_ids.push(new_path_id);
         let (pk, _) = get_user_public_keys(client, path_record.user_id).await?;
         let authorization_seed_ct = encrypt_authorization_seed(&pk, authorization_seed)?;
         client
             .post_authorization_seed(
                 data_sk,
-                path_record.path_id,
+                new_path_id,
                 path_record.user_id,
                 &authorization_seed_ct,
             )
@@ -194,10 +197,6 @@ async fn add_contents_generic(
     let new_readable_user_path_ids = new_path_id_of_user_id
         .values()
         .map(|v| *v)
-        .collect::<Vec<DBInt>>();
-    let new_writable_user_path_ids = writeable_user_ids
-        .iter()
-        .map(|user_id| new_path_id_of_user_id[user_id])
         .collect::<Vec<DBInt>>();
     let new_contents_data = ContentsData {
         is_file,

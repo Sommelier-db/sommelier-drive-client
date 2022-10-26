@@ -372,7 +372,7 @@ impl HttpClient {
             map_for_sign.insert(key, val_str);
         }
 
-        let req_without_auth = client.post(&url).json(&map_for_post);
+        let req_without_auth = client.put(&url).json(&map_for_post);
         let pre_record = self.get_contents(shared_key_hash).await?;
         let nonce = pre_record.nonce;
         let res = self
