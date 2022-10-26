@@ -18,11 +18,6 @@ typedef struct CUserInfo {
   char *keyword_sk;
 } CUserInfo;
 
-typedef struct CPublicKeys {
-  char *data_pk;
-  char *keyword_pk;
-} CPublicKeys;
-
 typedef struct CContentsData {
   int is_file;
   size_t num_readable_users;
@@ -32,6 +27,16 @@ typedef struct CContentsData {
   const uint8_t *file_bytes_ptr;
   size_t file_bytes_len;
 } CContentsData;
+
+typedef struct CPathVec {
+  char **ptr;
+  size_t len;
+} CPathVec;
+
+typedef struct CPublicKeys {
+  char *data_pk;
+  char *keyword_pk;
+} CPublicKeys;
 
 int addDirectory(struct CHttpClient client, struct CUserInfo user_info, char *filepath);
 
@@ -46,10 +51,17 @@ int addReadPermission(struct CHttpClient client,
                       char *filepath,
                       uint64_t new_user_id);
 
-int getChildrenPathes(struct CHttpClient client,
-                      struct CUserInfo user_info,
-                      char *cur_path,
-                      char **result_pathes);
+void freeContentsData(struct CContentsData value);
+
+void freePathVec(struct CPathVec value);
+
+void freePublicKeys(struct CPublicKeys value);
+
+void freeUserInfo(struct CUserInfo value);
+
+struct CPathVec getChildrenPathes(struct CHttpClient client,
+                                  struct CUserInfo user_info,
+                                  char *cur_path);
 
 char *getFilePathWithId(struct CHttpClient client, struct CUserInfo user_info, uint64_t path_id);
 
@@ -69,7 +81,6 @@ struct CContentsData openFilepath(struct CHttpClient client,
 
 struct CUserInfo registerUser(struct CHttpClient client, char *filepath);
 
-int searchDescendantPathes(struct CHttpClient client,
-                           struct CUserInfo user_info,
-                           char *cur_path,
-                           char **result_pathes);
+struct CPathVec searchDescendantPathes(struct CHttpClient client,
+                                       struct CUserInfo user_info,
+                                       char *cur_path);

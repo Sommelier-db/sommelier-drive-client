@@ -1,5 +1,7 @@
 use crate::*;
 use anyhow;
+use c_vec::CSlice;
+use c_vec::CVec;
 use core::slice;
 use easy_ffi::easy_ffi;
 use errno::{set_errno, Errno};
@@ -77,6 +79,12 @@ impl TryInto<SelfUserInfo> for CUserInfo {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn freeUserInfo(value: CUserInfo) {
+    mem::forget(value.data_sk);
+    mem::forget(value.keyword_sk);
+}
+
 easy_ffi!(fn_user_info =>
     |err| {
         set_errno(Errno(EINVAL));
@@ -115,6 +123,12 @@ fn_user_info!(
 pub struct CPublicKeys {
     data_pk: *mut c_char,
     keyword_pk: *mut c_char,
+}
+
+#[no_mangle]
+pub extern "C" fn freePublicKeys(value: CPublicKeys) {
+    mem::forget(value.data_pk);
+    mem::forget(value.keyword_pk);
 }
 
 easy_ffi!(fn_public_keys=>
@@ -179,6 +193,85 @@ fn_char_pointer!(
     }
 );
 
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct CPathVec {
+    ptr: *mut *mut c_char,
+    len: usize,
+}
+
+#[no_mangle]
+pub extern "C" fn freePathVec(value: CPathVec) {
+    mem::drop(value.ptr);
+}
+
+easy_ffi!(fn_path_vec =>
+    |err| {
+        set_errno(Errno(EINVAL));
+        return CPathVec {
+            ptr: ptr::null_mut(),
+            len: 0
+        };
+    }
+    |panic_val| {
+        set_errno(Errno(EINVAL));
+        match panic_val.downcast_ref::<&'static str>() {
+            Some(s) => panic!("sommelier-drive-client-panic: {}",s),
+            None => panic!("sommelier-drive-client-panic without an error message"),
+        }
+    }
+);
+
+fn_path_vec!(
+    fn getChildrenPathes(
+        client: CHttpClient,
+        user_info: CUserInfo,
+        cur_path: *mut c_char,
+    ) -> Result<CPathVec, anyhow::Error> {
+        let client = client.into();
+        let user_info = user_info.try_into()?;
+        let cur_path = ptr2str(cur_path);
+        let fut_result = async { get_children_pathes(&client, &user_info, cur_path).await };
+        let rt = Runtime::new()?;
+        let filepath_vec = rt.block_on(fut_result)?;
+        let len = filepath_vec.len();
+        let mut filepath_strs = filepath_vec
+            .iter()
+            .map(|path| str2ptr(path))
+            .collect::<Vec<*mut c_char>>();
+        let ptr = filepath_strs.as_mut_ptr();
+        mem::forget(filepath_strs);
+        Ok(CPathVec { ptr, len })
+    }
+);
+
+fn_path_vec!(
+    fn searchDescendantPathes(
+        client: CHttpClient,
+        user_info: CUserInfo,
+        cur_path: *mut c_char,
+    ) -> Result<CPathVec, anyhow::Error> {
+        let client = client.into();
+        let user_info = user_info.try_into()?;
+        let cur_path = ptr2str(cur_path);
+        let fut_result = async { search_descendant_pathes(&client, &user_info, cur_path).await };
+        let rt = Runtime::new()?;
+        let filepath_vec = rt.block_on(fut_result)?;
+        let len = filepath_vec.len();
+        let mut filepath_strs = filepath_vec
+            .iter()
+            .map(|path| str2ptr(path))
+            .collect::<Vec<*mut c_char>>();
+        let ptr = filepath_strs.as_mut_ptr();
+        mem::forget(filepath_strs);
+        /*let result_pathes = unsafe { slice::from_raw_parts_mut(result_pathes, 0) };
+        for (i, filepath) in filepath_vec.into_iter().enumerate() {
+            result_pathes[i] = str2ptr(filepath.as_str());
+        }*/
+        Ok(CPathVec { ptr, len })
+    }
+);
+
 easy_ffi!(fn_int =>
     |err| {
         set_errno(Errno(EINVAL));
@@ -190,50 +283,6 @@ easy_ffi!(fn_int =>
             Some(s) => panic!("sommelier-drive-client-panic: {}",s),
             None => panic!("sommelier-drive-client-panic without an error message"),
         }
-    }
-);
-
-fn_int!(
-    fn getChildrenPathes(
-        client: CHttpClient,
-        user_info: CUserInfo,
-        cur_path: *mut c_char,
-        result_pathes: *mut *mut c_char,
-    ) -> Result<c_int, anyhow::Error> {
-        let client = client.into();
-        let user_info = user_info.try_into()?;
-        let cur_path = ptr2str(cur_path);
-        let fut_result = async { get_children_pathes(&client, &user_info, cur_path).await };
-        let rt = Runtime::new()?;
-        let filepath_vec = rt.block_on(fut_result)?;
-        let len = filepath_vec.len();
-        let result_pathes = unsafe { slice::from_raw_parts_mut(result_pathes, 0) };
-        for (i, filepath) in filepath_vec.into_iter().enumerate() {
-            result_pathes[i] = str2ptr(filepath.as_str());
-        }
-        Ok(len as c_int)
-    }
-);
-
-fn_int!(
-    fn searchDescendantPathes(
-        client: CHttpClient,
-        user_info: CUserInfo,
-        cur_path: *mut c_char,
-        result_pathes: *mut *mut c_char,
-    ) -> Result<c_int, anyhow::Error> {
-        let client = client.into();
-        let user_info = user_info.try_into()?;
-        let cur_path = ptr2str(cur_path);
-        let fut_result = async { search_descendant_pathes(&client, &user_info, cur_path).await };
-        let rt = Runtime::new()?;
-        let filepath_vec = rt.block_on(fut_result)?;
-        let len = filepath_vec.len();
-        let result_pathes = unsafe { slice::from_raw_parts_mut(result_pathes, 0) };
-        for (i, filepath) in filepath_vec.into_iter().enumerate() {
-            result_pathes[i] = str2ptr(filepath.as_str());
-        }
-        Ok(len as c_int)
     }
 );
 
@@ -271,12 +320,29 @@ pub struct CContentsData {
 
 impl From<ContentsData> for CContentsData {
     fn from(mut value: ContentsData) -> Self {
+        /*let readable_user_path_ids = unsafe {
+            CVec::new(
+                value.readable_user_path_ids.as_mut_slice().as_mut_ptr(),
+                value.readable_user_path_ids.len(),
+            )
+        };
+        let readable_user_path_ids_ptr = unsafe { readable_user_path_ids.into_inner() };*/
         let readable_user_path_ids_ptr = value.readable_user_path_ids.as_mut_ptr();
         mem::forget(value.readable_user_path_ids);
+        /*let writeable_user_path_ids = unsafe {
+            CVec::new(
+                value.writeable_user_path_ids.as_mut_slice().as_mut_ptr(),
+                value.writeable_user_path_ids.len(),
+            )
+        };
+        let writeable_user_path_ids_ptr = unsafe { writeable_user_path_ids.into_inner() };*/
         let writeable_user_path_ids_ptr = value.writeable_user_path_ids.as_mut_ptr();
         mem::forget(value.writeable_user_path_ids);
-        let file_bytes_ptr = value.file_bytes.as_ptr();
         let file_bytes_len = value.file_bytes.len();
+        /*let file_bytes =
+            unsafe { CVec::new(value.file_bytes.as_mut_slice().as_mut_ptr(), file_bytes_len) };
+        let file_bytes_ptr = unsafe { file_bytes.into_inner() } as *const u8;*/
+        let file_bytes_ptr = value.file_bytes.as_mut_ptr();
         mem::forget(value.file_bytes);
         Self {
             is_file: if value.is_file { 1 } else { 0 },
@@ -292,15 +358,20 @@ impl From<ContentsData> for CContentsData {
 
 impl Into<ContentsData> for CContentsData {
     fn into(self) -> ContentsData {
+        /*let readable_user_path_ids =
+        unsafe { slice::from_raw_parts(self.readable_user_path_ids, self.num_readable_users) }
+            .to_vec();*/
         let readable_user_path_ids =
-            unsafe { slice::from_raw_parts(self.readable_user_path_ids, self.num_readable_users) }
-                .to_vec();
-        let writeable_user_path_ids = unsafe {
+            unsafe { CVec::new(self.readable_user_path_ids, self.num_readable_users) }.into();
+        /*let writeable_user_path_ids = unsafe {
             slice::from_raw_parts(self.writeable_user_path_ids, self.num_writeable_users)
         }
-        .to_vec();
-        let file_bytes =
-            unsafe { slice::from_raw_parts(self.file_bytes_ptr, self.file_bytes_len) }.to_vec();
+        .to_vec();*/
+        let writeable_user_path_ids =
+            unsafe { CVec::new(self.writeable_user_path_ids, self.num_writeable_users) }.into();
+        /*let file_bytes =
+        unsafe { slice::from_raw_parts(self.file_bytes_ptr, self.file_bytes_len) }.to_vec();*/
+        let file_bytes = unsafe { CSlice::new(self.file_bytes_ptr, self.file_bytes_len) }.into();
         ContentsData {
             is_file: self.is_file == 1,
             num_readable_users: self.num_readable_users,
@@ -312,6 +383,13 @@ impl Into<ContentsData> for CContentsData {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn freeContentsData(value: CContentsData) {
+    mem::drop(value.readable_user_path_ids);
+    mem::drop(value.writeable_user_path_ids);
+    mem::drop(value.file_bytes_ptr);
+}
+
 easy_ffi!(fn_contents_data =>
     |err| {
         set_errno(Errno(EINVAL));
@@ -321,7 +399,7 @@ easy_ffi!(fn_contents_data =>
             num_writeable_users: 0,
             readable_user_path_ids: ptr::null_mut(),
             writeable_user_path_ids: ptr::null_mut(),
-            file_bytes_ptr: ptr::null(),
+            file_bytes_ptr: ptr::null_mut(),
             file_bytes_len: 0,
         };
     }
@@ -346,7 +424,7 @@ fn_contents_data!(
         let fut_result = async { open_filepath(&client, &user_info, filepath).await };
         let rt = Runtime::new()?;
         let contents_data = rt.block_on(fut_result)?;
-        Ok(contents_data.into())
+        Ok(CContentsData::from(contents_data))
     }
 );
 
@@ -375,7 +453,8 @@ fn_result_int!(
         let client = client.into();
         let user_info = user_info.try_into()?;
         let filepath = ptr2str(filepath);
-        let file_bytes = unsafe { slice::from_raw_parts(file_bytes_ptr, file_bytes_len) }.to_vec();
+        //let file_bytes = unsafe { slice::from_raw_parts(file_bytes_ptr, file_bytes_len) }.to_vec();
+        let file_bytes = unsafe { CSlice::new(file_bytes_ptr, file_bytes_len) }.into();
         let fut_result = async { add_file(&client, &user_info, filepath, file_bytes).await };
         let rt = Runtime::new()?;
         rt.block_on(fut_result)?;
@@ -428,8 +507,9 @@ fn_result_int!(
         let client = client.into();
         let user_info = user_info.try_into()?;
         let filepath = ptr2str(filepath);
-        let file_bytes =
-            unsafe { slice::from_raw_parts(new_file_bytes_ptr, new_file_bytes_len) }.to_vec();
+        /*let file_bytes =
+        unsafe { slice::from_raw_parts(new_file_bytes_ptr, new_file_bytes_len) }.to_vec();*/
+        let file_bytes = unsafe { CSlice::new(new_file_bytes_ptr, new_file_bytes_len) }.into();
         let fut_result = async { modify_file(&client, &user_info, filepath, file_bytes).await };
         let rt = Runtime::new()?;
         rt.block_on(fut_result)?;

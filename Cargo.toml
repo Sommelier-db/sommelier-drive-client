@@ -24,7 +24,7 @@ easy_ffi = {version = "0.1.0", git = "https://github.com/SoraSuegami/easy_ffi.gi
 errno = {version = "0.2.8", optional = true}
 #futures = {version = "0.3.25", features = ["executor"], optional = true}
 tokio = {version = "1.21.2", features = ["rt", "rt-multi-thread"], optional = true}
-
+c_vec = {version="2.0.0", optional = true}
 
 [dev-dependencies]
 tokio = {version = "1.21.2", features = ["macros"]}
@@ -35,7 +35,7 @@ crate-type = ["cdylib", "rlib", "staticlib"]
 
 [features]
 default = ["c_api"]
-c_api = ["easy_ffi", "errno", "tokio"]
+c_api = ["easy_ffi", "errno", "tokio", "c_vec"]
 
 [profile.test] 
 opt-level = 3
