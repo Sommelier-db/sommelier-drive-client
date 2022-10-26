@@ -81,9 +81,9 @@ pub async fn register_user(client: &HttpClient, filepath: &str) -> Result<SelfUs
         )
         .await?;
     // 5. Write permission table
-    client
-        .post_write_permission(&user_info.data_sk, user_info.id, path_id, user_info.id)
-        .await?;
+    /*client
+    .post_write_permission(&user_info.data_sk, user_info.id, path_id, user_info.id)
+    .await?;*/
 
     Ok(user_info)
 }

@@ -433,7 +433,6 @@ impl HttpClient {
             map_for_post.insert(key, val_json);
             map_for_sign.insert(key, val_str);
         }
-
         let req_without_auth = client.post(&url).json(&map_for_post);
         let nonce = self.get_nonce_of_user_id(write_user_id).await?;
         let res = self
