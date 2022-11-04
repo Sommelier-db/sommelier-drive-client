@@ -48,46 +48,22 @@ pub struct SharedKeyTableRecord {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AuthorizationSeedTableRecord {
-    #[serde(rename = "authorizationId")]
-    pub authorization_seed_id: DBInt,
-    #[serde(rename = "pathId")]
-    pub path_id: DBInt,
-    #[serde(rename = "ct")]
-    pub authorization_seed_ct: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ContentsTableReocrd {
     #[serde(rename = "contentsId")]
     pub contents_id: DBInt,
     #[serde(rename = "sharedKeyHash")]
     pub shared_key_hash: String,
-    #[serde(rename = "authorizationPK")]
-    pub authorization_pk: String,
     #[serde(rename = "nonce")]
     pub nonce: DBInt,
     #[serde(rename = "ct")]
     pub contents_ct: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WritePermissionTableRecord {
-    #[serde(rename = "wPermissionId")]
-    pub w_permission_id: DBInt,
-    #[serde(rename = "pathId")]
-    pub path_id: DBInt,
-    #[serde(rename = "userId")]
-    pub user_id: DBInt,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContentsData {
     pub is_file: bool,
     pub num_readable_users: usize,
-    pub num_writeable_users: usize,
     pub readable_user_path_ids: Vec<DBInt>,
-    pub writeable_user_path_ids: Vec<DBInt>,
     pub file_bytes: Vec<u8>,
 }
 
@@ -98,25 +74,17 @@ impl ContentsData {
         let mut p = &bytes[..];
         let is_file = p.get_u8() == 1u8;
         let num_readable_users = p.get_u64() as usize;
-        let num_writeable_users = p.get_u64() as usize;
         let mut readable_user_path_ids = Vec::with_capacity(num_readable_users);
         for _ in 0..num_readable_users {
             let user_id = p.get_u64();
             readable_user_path_ids.push(user_id);
-        }
-        let mut writeable_user_path_ids = Vec::with_capacity(num_writeable_users);
-        for _ in 0..num_writeable_users {
-            let user_id = p.get_u64();
-            writeable_user_path_ids.push(user_id);
         }
         let mut file_bytes = Vec::new();
         file_bytes.put(&mut p.take(Self::MAX_BYTE_SIZE));
         Self {
             is_file,
             num_readable_users,
-            num_writeable_users,
             readable_user_path_ids,
-            writeable_user_path_ids,
             file_bytes,
         }
     }
@@ -125,12 +93,8 @@ impl ContentsData {
         let mut buf = Vec::new();
         buf.put_u8(if self.is_file { 1u8 } else { 0u8 });
         buf.put_u64(self.num_readable_users as u64);
-        buf.put_u64(self.num_writeable_users as u64);
         for i in 0..self.num_readable_users {
             buf.put_u64(self.readable_user_path_ids[i]);
-        }
-        for i in 0..self.num_writeable_users {
-            buf.put_u64(self.writeable_user_path_ids[i]);
         }
         for file_byte in self.file_bytes.iter() {
             buf.put_u8(*file_byte);
@@ -148,9 +112,7 @@ mod test {
         let test_data = ContentsData {
             is_file: true,
             num_readable_users: 2,
-            num_writeable_users: 2,
             readable_user_path_ids: vec![1, 2],
-            writeable_user_path_ids: vec![1, 2],
             file_bytes: vec![7; 32],
         };
         let test_data_bytes = test_data.to_bytes();

@@ -21,9 +21,7 @@ typedef struct CUserInfo {
 typedef struct CContentsData {
   int is_file;
   size_t num_readable_users;
-  size_t num_writeable_users;
   uint64_t *readable_user_path_ids;
-  uint64_t *writeable_user_path_ids;
   const uint8_t *file_bytes_ptr;
   size_t file_bytes_len;
 } CContentsData;

@@ -264,10 +264,6 @@ fn_path_vec!(
             .collect::<Vec<*mut c_char>>();
         let ptr = filepath_strs.as_mut_ptr();
         mem::forget(filepath_strs);
-        /*let result_pathes = unsafe { slice::from_raw_parts_mut(result_pathes, 0) };
-        for (i, filepath) in filepath_vec.into_iter().enumerate() {
-            result_pathes[i] = str2ptr(filepath.as_str());
-        }*/
         Ok(CPathVec { ptr, len })
     }
 );
@@ -311,45 +307,22 @@ fn_int!(
 pub struct CContentsData {
     is_file: c_int,
     num_readable_users: usize,
-    num_writeable_users: usize,
     readable_user_path_ids: *mut u64,
-    writeable_user_path_ids: *mut u64,
     file_bytes_ptr: *const u8,
     file_bytes_len: usize,
 }
 
 impl From<ContentsData> for CContentsData {
     fn from(mut value: ContentsData) -> Self {
-        /*let readable_user_path_ids = unsafe {
-            CVec::new(
-                value.readable_user_path_ids.as_mut_slice().as_mut_ptr(),
-                value.readable_user_path_ids.len(),
-            )
-        };
-        let readable_user_path_ids_ptr = unsafe { readable_user_path_ids.into_inner() };*/
         let readable_user_path_ids_ptr = value.readable_user_path_ids.as_mut_ptr();
         mem::forget(value.readable_user_path_ids);
-        /*let writeable_user_path_ids = unsafe {
-            CVec::new(
-                value.writeable_user_path_ids.as_mut_slice().as_mut_ptr(),
-                value.writeable_user_path_ids.len(),
-            )
-        };
-        let writeable_user_path_ids_ptr = unsafe { writeable_user_path_ids.into_inner() };*/
-        let writeable_user_path_ids_ptr = value.writeable_user_path_ids.as_mut_ptr();
-        mem::forget(value.writeable_user_path_ids);
         let file_bytes_len = value.file_bytes.len();
-        /*let file_bytes =
-            unsafe { CVec::new(value.file_bytes.as_mut_slice().as_mut_ptr(), file_bytes_len) };
-        let file_bytes_ptr = unsafe { file_bytes.into_inner() } as *const u8;*/
         let file_bytes_ptr = value.file_bytes.as_mut_ptr();
         mem::forget(value.file_bytes);
         Self {
             is_file: if value.is_file { 1 } else { 0 },
             num_readable_users: value.num_readable_users,
-            num_writeable_users: value.num_writeable_users,
             readable_user_path_ids: readable_user_path_ids_ptr,
-            writeable_user_path_ids: writeable_user_path_ids_ptr,
             file_bytes_ptr,
             file_bytes_len,
         }
@@ -358,26 +331,13 @@ impl From<ContentsData> for CContentsData {
 
 impl Into<ContentsData> for CContentsData {
     fn into(self) -> ContentsData {
-        /*let readable_user_path_ids =
-        unsafe { slice::from_raw_parts(self.readable_user_path_ids, self.num_readable_users) }
-            .to_vec();*/
         let readable_user_path_ids =
             unsafe { CVec::new(self.readable_user_path_ids, self.num_readable_users) }.into();
-        /*let writeable_user_path_ids = unsafe {
-            slice::from_raw_parts(self.writeable_user_path_ids, self.num_writeable_users)
-        }
-        .to_vec();*/
-        let writeable_user_path_ids =
-            unsafe { CVec::new(self.writeable_user_path_ids, self.num_writeable_users) }.into();
-        /*let file_bytes =
-        unsafe { slice::from_raw_parts(self.file_bytes_ptr, self.file_bytes_len) }.to_vec();*/
         let file_bytes = unsafe { CSlice::new(self.file_bytes_ptr, self.file_bytes_len) }.into();
         ContentsData {
             is_file: self.is_file == 1,
             num_readable_users: self.num_readable_users,
-            num_writeable_users: self.num_writeable_users,
             readable_user_path_ids,
-            writeable_user_path_ids,
             file_bytes,
         }
     }
@@ -386,7 +346,6 @@ impl Into<ContentsData> for CContentsData {
 #[no_mangle]
 pub extern "C" fn freeContentsData(value: CContentsData) {
     mem::drop(value.readable_user_path_ids);
-    mem::drop(value.writeable_user_path_ids);
     mem::drop(value.file_bytes_ptr);
 }
 
@@ -396,9 +355,7 @@ easy_ffi!(fn_contents_data =>
         return CContentsData {
             is_file: -1,
             num_readable_users: 0,
-            num_writeable_users: 0,
             readable_user_path_ids: ptr::null_mut(),
-            writeable_user_path_ids: ptr::null_mut(),
             file_bytes_ptr: ptr::null_mut(),
             file_bytes_len: 0,
         };
@@ -453,7 +410,6 @@ fn_result_int!(
         let client = client.into();
         let user_info = user_info.try_into()?;
         let filepath = ptr2str(filepath);
-        //let file_bytes = unsafe { slice::from_raw_parts(file_bytes_ptr, file_bytes_len) }.to_vec();
         let file_bytes = unsafe { CSlice::new(file_bytes_ptr, file_bytes_len) }.into();
         let fut_result = async { add_file(&client, &user_info, filepath, file_bytes).await };
         let rt = Runtime::new()?;

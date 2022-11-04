@@ -40,40 +40,10 @@ pub(crate) async fn recover_shared_key_of_filepath(
             filepath
         )))?;
 
-    /*
-    let mut rng = rand_core::OsRng;
-    let td = gen_trapdoor_for_prefix_search_exact::<_, Fr, _>(
-        &user_info.keyword_sk,
-        &client.region_name,
-        &filepath,
-        &mut rng,
-    )?;
-    let records = client.search_file_pathes(user_info.id, &td).await?;
-    let path_id = records[0].path_id;
-    */
     let shared_key_record = client.get_shared_key(path_id).await?;
     let shared_key_ct = hex::decode(&shared_key_record.shared_key_ct)?;
     let recovered_shared_key = recover_shared_key(&user_info.data_sk, &shared_key_ct)?;
     Ok(recovered_shared_key)
-}
-
-pub(crate) async fn recover_authorization_seed_of_filepath(
-    client: &HttpClient,
-    user_info: &SelfUserInfo,
-    filepath: &str,
-) -> Result<AuthorizationSeed> {
-    let path_id = get_path_id_of_filepath(client, user_info, filepath)
-        .await?
-        .ok_or(anyhow::anyhow!(format!(
-            "No file exists for the filepath {}",
-            filepath
-        )))?;
-    let authorization_record = client.get_authorization_key(path_id).await?;
-    let authorization_seed_ct =
-        AuthorizationSeedCT::from_str(&authorization_record.authorization_seed_ct)?;
-    let authorization_seed =
-        decrypt_authorization_seed_ct(&user_info.data_sk, &authorization_seed_ct)?;
-    Ok(authorization_seed)
 }
 
 pub(crate) fn decrypt_filepath_ct_str(ct_str: &str, data_sk: &PkeSecretKey) -> Result<String> {

@@ -35,7 +35,7 @@ pub async fn register_user(client: &HttpClient, filepath: &str) -> Result<SelfUs
     )?;
     let shared_key_ct = shared_key_cts[0].clone();
 
-    // 1. User table & Path table & Write permission table
+    // 1. User table & Path table
     let user_id = client
         .post_user(&data_pk, &keyword_pk, &data_ct, &keyword_ct)
         .await?;
@@ -49,41 +49,20 @@ pub async fn register_user(client: &HttpClient, filepath: &str) -> Result<SelfUs
         .expect("The initial path id does not exist.");
     // 2. Shared key table
     client
-        .post_shared_key(&user_info.data_sk, path_id, user_info.id, &shared_key_ct)
+        .post_shared_key(&user_info.data_sk, path_id, &shared_key_ct)
         .await?;
-    // 3. Authorization code table
-    let authorization_seed = gen_authorization_seed();
-    let authorization_seed_ct = encrypt_authorization_seed(&data_pk, authorization_seed)?;
-    client
-        .post_authorization_seed(
-            &user_info.data_sk,
-            path_id,
-            user_info.id,
-            &authorization_seed_ct,
-        )
-        .await?;
-    // 4. Contents table
+    // 3. Contents table
     let new_contents_data = ContentsData {
         is_file: false,
         num_readable_users: 1,
-        num_writeable_users: 1,
         readable_user_path_ids: vec![path_id],
-        writeable_user_path_ids: vec![path_id],
         file_bytes: Vec::new(),
     };
     let contents_ct =
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents_data.to_bytes())?;
     client
-        .post_contents(
-            authorization_seed,
-            &recovered_shared_key.shared_key_hash,
-            &contents_ct,
-        )
+        .post_contents(&recovered_shared_key.shared_key_hash, &contents_ct)
         .await?;
-    // 5. Write permission table
-    /*client
-    .post_write_permission(&user_info.data_sk, user_info.id, path_id, user_info.id)
-    .await?;*/
 
     Ok(user_info)
 }

@@ -111,9 +111,7 @@ async fn add_contents_generic(
     let (filename, cur_dir) = split_filepath(filepath)?;
     let cur_dir_contents = open_filepath(client, user_info, cur_dir.as_str()).await?;
     let readable_user_path_ids = cur_dir_contents.readable_user_path_ids;
-    let writeable_user_path_ids = cur_dir_contents.writeable_user_path_ids;
     let num_readable_users = readable_user_path_ids.len();
-    let num_writeable_users = writeable_user_path_ids.len();
     let filepath = cur_dir.to_string() + "/" + filename.as_str();
     let mut readbale_user_ids = Vec::with_capacity(num_readable_users);
     let mut data_pks = Vec::with_capacity(num_readable_users);
@@ -126,8 +124,6 @@ async fn add_contents_generic(
         data_pks.push(data_pk);
         keyword_pks.push(keyword_pk);
     }
-    /*let contents_bytes = new_contents_data.to_bytes();
-    let file_ct = encrypt_new_file(&data_pks, &filepath, &contents_bytes)?;*/
     let (filepath_cts, shared_key_cts, recovered_shared_key) =
         encrypt_new_path_for_multi_pks(&data_pks, &filepath)?;
     let mut rng = rand_core::OsRng;
@@ -148,7 +144,6 @@ async fn add_contents_generic(
         let path_id = client
             .post_file_path(
                 data_sk,
-                write_user_id,
                 read_user_id,
                 &permission_hash,
                 &filepath_cts[i],
@@ -166,29 +161,7 @@ async fn add_contents_generic(
             .post_shared_key(
                 data_sk,
                 new_path_id_of_user_id[&read_user_id],
-                write_user_id,
                 shared_key_ct,
-            )
-            .await?;
-    }
-
-    // 3. Authorization seed table
-    let authorization_seed = gen_authorization_seed();
-    let mut writeable_user_ids = Vec::with_capacity(num_writeable_users);
-    let mut new_writable_user_path_ids = Vec::with_capacity(num_writeable_users);
-    for i in 0..num_writeable_users {
-        let path_record = client.get_filepath(writeable_user_path_ids[i]).await?;
-        writeable_user_ids.push(path_record.user_id);
-        let new_path_id = new_path_id_of_user_id[&path_record.user_id];
-        new_writable_user_path_ids.push(new_path_id);
-        let (pk, _) = get_user_public_keys(client, path_record.user_id).await?;
-        let authorization_seed_ct = encrypt_authorization_seed(&pk, authorization_seed)?;
-        client
-            .post_authorization_seed(
-                data_sk,
-                new_path_id,
-                path_record.user_id,
-                &authorization_seed_ct,
             )
             .await?;
     }
@@ -201,29 +174,14 @@ async fn add_contents_generic(
     let new_contents_data = ContentsData {
         is_file,
         num_readable_users,
-        num_writeable_users,
         readable_user_path_ids: new_readable_user_path_ids,
-        writeable_user_path_ids: new_writable_user_path_ids,
         file_bytes,
     };
     let contents_ct =
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents_data.to_bytes())?;
     client
-        .post_contents(
-            authorization_seed,
-            &recovered_shared_key.shared_key_hash,
-            &contents_ct,
-        )
+        .post_contents(&recovered_shared_key.shared_key_hash, &contents_ct)
         .await?;
-
-    // 5. Write permission table
-    for i in 0..num_writeable_users {
-        let path_id = new_contents_data.writeable_user_path_ids[i];
-        let user_id = writeable_user_ids[i];
-        client
-            .post_write_permission(data_sk, write_user_id, path_id, user_id)
-            .await?;
-    }
     Ok(())
 }
 
@@ -250,7 +208,6 @@ pub async fn add_read_permission(
     let new_path_id = client
         .post_file_path(
             &user_info.data_sk,
-            user_info.id,
             new_user_id,
             &permission_hash,
             &permission_ct.filepath_ct,
@@ -263,7 +220,6 @@ pub async fn add_read_permission(
         .post_shared_key(
             &user_info.data_sk,
             new_path_id,
-            new_user_id,
             &permission_ct.shared_key_ct,
         )
         .await?;
@@ -280,78 +236,8 @@ pub async fn add_read_permission(
     new_contents.readable_user_path_ids.push(new_path_id);
     let new_contents_ct =
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
-    let authorization_seed =
-        recover_authorization_seed_of_filepath(client, user_info, filepath).await?;
     client
-        .put_contents(
-            authorization_seed,
-            &recovered_shared_key.shared_key_hash,
-            &new_contents_ct,
-        )
-        .await?;
-    Ok(())
-}
-
-pub async fn add_write_permission(
-    client: &HttpClient,
-    user_info: &SelfUserInfo,
-    filepath: &str,
-    new_user_id: DBInt,
-) -> Result<()> {
-    let recovered_shared_key = recover_shared_key_of_filepath(client, user_info, filepath).await?;
-    let authorization_seed =
-        recover_authorization_seed_of_filepath(client, user_info, filepath).await?;
-    let pre_contents_record = client
-        .get_contents(&recovered_shared_key.shared_key_hash)
-        .await?;
-    let mut new_contents = decrypt_contents_ct_str(
-        &pre_contents_record.contents_ct.to_string(),
-        &recovered_shared_key.shared_key,
-    )?;
-    let mut new_user_path_id = None;
-    for path_id in new_contents.readable_user_path_ids.iter() {
-        let path_record = client.get_filepath(*path_id).await?;
-        if path_record.user_id == new_user_id {
-            new_user_path_id = Some(path_id);
-        }
-    }
-    let new_user_path_id = *new_user_path_id.ok_or(anyhow::anyhow!(
-        "For the write permission, the user first needs to have the read permission."
-    ))?;
-
-    // 1. Authorization Seed Table
-    let (pk, _) = get_user_public_keys(client, new_user_id).await?;
-    let authorization_seed_ct = encrypt_authorization_seed(&pk, authorization_seed)?;
-    client
-        .post_authorization_seed(
-            &user_info.data_sk,
-            new_user_path_id,
-            new_user_id,
-            &authorization_seed_ct,
-        )
-        .await?;
-
-    // 2. Contents table
-    new_contents.num_writeable_users += 1;
-    new_contents.writeable_user_path_ids.push(new_user_path_id);
-    let new_contents_ct =
-        encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
-    client
-        .put_contents(
-            authorization_seed,
-            &recovered_shared_key.shared_key_hash,
-            &new_contents_ct,
-        )
-        .await?;
-
-    // 3. Write permission table
-    client
-        .post_write_permission(
-            &user_info.data_sk,
-            user_info.id,
-            new_user_path_id,
-            new_user_id,
-        )
+        .put_contents(&recovered_shared_key.shared_key_hash, &new_contents_ct)
         .await?;
     Ok(())
 }
@@ -363,8 +249,6 @@ pub async fn modify_file(
     new_file_bytes: Vec<u8>,
 ) -> Result<()> {
     let recovered_shared_key = recover_shared_key_of_filepath(client, user_info, filepath).await?;
-    let authorization_seed =
-        recover_authorization_seed_of_filepath(client, user_info, filepath).await?;
     let pre_contents_record = client
         .get_contents(&recovered_shared_key.shared_key_hash)
         .await?;
@@ -377,11 +261,7 @@ pub async fn modify_file(
     let new_contents_ct =
         encrypt_new_file_with_shared_key(&recovered_shared_key, &new_contents.to_bytes())?;
     client
-        .put_contents(
-            authorization_seed,
-            &recovered_shared_key.shared_key_hash,
-            &new_contents_ct,
-        )
+        .put_contents(&recovered_shared_key.shared_key_hash, &new_contents_ct)
         .await?;
     Ok(())
 }
