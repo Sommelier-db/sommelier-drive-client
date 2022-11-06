@@ -28,7 +28,7 @@ async fn touch_flow_test() -> Result<()> {
     assert!(contents_data.is_file);
     assert_eq!(contents_data.num_readable_users, 1);
     assert_eq!(contents_data.file_bytes, test_text);
-    assert_eq!(contents_data.readable_user_path_ids[0], user_info.id);
+    assert_eq!(contents_data.readable_user_path_ids.len(), 1);
 
     let got_path =
         get_filepath_with_id(&client, &user_info, contents_data.readable_user_path_ids[0]).await?;
@@ -55,7 +55,7 @@ async fn mkdir_flow_test() -> Result<()> {
     let contents_data = open_filepath(&client, &user_info, &filepath).await?;
     assert!(!contents_data.is_file);
     assert_eq!(contents_data.num_readable_users, 1);
-    assert_eq!(contents_data.readable_user_path_ids[0], user_info.id);
+    assert_eq!(contents_data.readable_user_path_ids.len(), 1);
     let got_path =
         get_filepath_with_id(&client, &user_info, contents_data.readable_user_path_ids[0]).await?;
     assert_eq!(got_path, filepath);
@@ -138,7 +138,7 @@ async fn modify_file_flow_test() -> Result<()> {
     let contents_data = open_filepath(&client, &user_info, &filepath).await?;
     assert!(contents_data.is_file);
     assert_eq!(contents_data.num_readable_users, 1);
-    assert_eq!(contents_data.readable_user_path_ids[0], user_info.id);
+    assert_eq!(contents_data.readable_user_path_ids.len(), 1);
     assert_eq!(contents_data.file_bytes, new_text);
     assert_ne!(contents_data.file_bytes, test_text);
     let got_path =
