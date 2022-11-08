@@ -9,6 +9,7 @@ You can install and build our library with the following commands.
 ```bash
 git clone https://github.com/Sommelier-db/sommelier-drive-client.git
 cd sommelier-drive-client
+git submodule update --init --recursive
 ./build.sh
 ```
 
